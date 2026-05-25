@@ -49,6 +49,104 @@ body {
   gap: 10px;
 }
 
+.help-button {
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 30;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(23, 23, 23, 0.34);
+  border-radius: 50%;
+  background: rgba(247, 244, 236, 0.9);
+  color: #171717;
+  box-shadow: 0 8px 18px rgba(23, 23, 23, 0.14);
+  cursor: pointer;
+}
+
+.help-button span {
+  font: 800 21px/1 Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+.help-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(23, 23, 23, 0.38);
+}
+
+.help-dialog {
+  position: relative;
+  width: min(640px, 100%);
+  max-height: min(760px, calc(100svh - 40px));
+  overflow: auto;
+  border: 1px solid rgba(23, 23, 23, 0.32);
+  border-radius: 8px;
+  padding: 24px 28px 26px;
+  background: #f7f4ec;
+  box-shadow: 0 30px 70px rgba(23, 23, 23, 0.34);
+}
+
+.help-dialog h1 {
+  margin: 0 42px 18px 0;
+  color: #171717;
+  font: 800 24px/1.1 Inter, ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0;
+}
+
+.help-dialog h2 {
+  margin: 18px 0 7px;
+  color: #171717;
+  font: 800 13px/1.2 Inter, ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.help-dialog p {
+  margin: 0 0 10px;
+  color: #292929;
+  font: 500 15px/1.5 Inter, ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0;
+}
+
+.help-dialog .help-highlight {
+  margin: 18px 0 16px;
+  color: #171717;
+}
+
+.help-dialog .help-highlight mark {
+  padding: 0.04em 0.16em;
+  background: rgba(255, 235, 89, 0.72);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  color: #171717;
+}
+
+.help-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(23, 23, 23, 0.24);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.58);
+  color: #171717;
+  cursor: pointer;
+}
+
+.help-close span {
+  transform: translateY(-1px);
+  font: 800 18px/1 Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
 .instrument-scroll {
   width: 100%;
   min-width: 0;
@@ -123,6 +221,19 @@ svg rect {
 @media (max-width: 560px) {
   .app-shell {
     padding: 8px;
+  }
+
+  .help-button {
+    top: 8px;
+    left: 8px;
+  }
+
+  .help-backdrop {
+    padding: 12px;
+  }
+
+  .help-dialog {
+    padding: 20px 20px 22px;
   }
 
   .instrument-svg {

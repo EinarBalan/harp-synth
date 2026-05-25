@@ -60,6 +60,15 @@ describe("App UI", () => {
     expect(screen.getByTestId("scale-label").textContent).toBe("CUSTOM");
   });
 
+  it("opens the how to play guide", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "How to play" }));
+
+    expect(screen.getByRole("dialog", { name: "How To Play" })).toBeTruthy();
+    expect(screen.getByText(/Red bars indicate the root/)).toBeTruthy();
+    expect(screen.getByText(/UNIFY links matching bars across octaves/)).toBeTruthy();
+  });
+
   it("switches to a three-octave layout", () => {
     render(<App />);
     fireEvent.click(screen.getByRole("tab", { name: "3 OCT" }));

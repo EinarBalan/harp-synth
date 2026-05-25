@@ -34,6 +34,7 @@ export default function App() {
   const [slide, setSlide] = useState(false);
   const [splitOctaves, setSplitOctaves] = useState(false);
   const [activeBar, setActiveBar] = useState<number | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const key = KEYS[keyIndex];
   const tone = TONES[toneIndex];
@@ -63,6 +64,21 @@ export default function App() {
       });
     }
   }, [key, octave]);
+
+  useEffect(() => {
+    if (!helpOpen) {
+      return;
+    }
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setHelpOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [helpOpen]);
 
   function getAudio() {
     if (!audioRef.current) {
@@ -211,6 +227,63 @@ export default function App() {
 
   return (
     <main className="app-shell">
+      <button type="button" className="help-button" aria-label="How to play" onClick={() => setHelpOpen(true)}>
+        <span aria-hidden="true">?</span>
+      </button>
+
+      {helpOpen ? (
+        <div className="help-backdrop" role="presentation" onPointerDown={() => setHelpOpen(false)}>
+          <section
+            className="help-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="help-title"
+            onPointerDown={(event) => event.stopPropagation()}
+          >
+            <button type="button" className="help-close" aria-label="Close how to play" onClick={() => setHelpOpen(false)}>
+              <span aria-hidden="true">x</span>
+            </button>
+            <h1 id="help-title">How To Play</h1>
+
+            <h2>Strum First</h2>
+            <p>
+              Hold the mouse down and sweep across the bars like a harp. Note that each bar is a half step higher than the one before it.
+            </p>
+
+            <h2>Scales And Toggles</h2>
+            <p>
+              The small buttons above the bars decide which pitches are allowed to sound. Lit buttons are enabled. Dark buttons are skipped,
+              so a strum automatically lands on the closest active note.
+            </p>
+            <p>
+              You can set a scale preset using the arrow buttons on the right side of the control panel. Scale presets are powerful because you don't need to know any music theory to get an interesting sound (although it certainly helps). Start with a preset, strum it, then turn bars on or off until you get something you like. 
+            </p>
+
+            <h2>Panel Controls</h2>
+            <p>
+              VOL controls loudness. OCT shifts the starting pitch up or down an octave. KEY moves the root around the circle of fifths. TONE the timbre or how the sound is produced. REVERB adds space. The scale selector and arrows move through preset interval sets.
+            </p>
+            <p>
+              CHOR adds an amp-style chorus effect. SUSTAIN lets notes keep ringing after release. SLIDE glides between notes instead of
+              jumping (e.g. legato). UNIFY links matching bars across octaves; turn it off when you want each octave edited independently.
+            </p>
+
+            <p className="help-highlight">
+              <mark>The best way to get started is to mess around and see what sounds cool!</mark>
+            </p>
+
+            <h2>Reading The Bars</h2>
+            <p>
+              By default we're in the key of C. There are several visual indicators to help you navigate the notes. Red bars indicate the root of the scale, the note that gives the key its name. Blue bars indicate the perfect fourth interval. The black dots mark the major third, perfect fifth, and major seventh intervals, also known as the major chord tones.
+            </p>
+            <p>
+              You do not need to memorize theory here: the colors and dots give you landmarks and you can figure out what sounds good by ear!
+            </p>
+
+          </section>
+        </div>
+      ) : null}
+
       <section className="instrument-stage" aria-label="Harp synth">
         <div className="instrument-scroll">
           <div className="instrument-scroll-inner">
