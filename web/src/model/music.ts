@@ -1,4 +1,7 @@
 export const BAR_COUNT = 24;
+export const PIANO_BAR_COUNT = 88;
+export type InstrumentRange = 1 | 2 | 3 | 4 | 5 | 6 | 7 | "piano";
+export const INSTRUMENT_RANGES: readonly InstrumentRange[] = [1, 2, 3, 4, 5, 6, 7, "piano"];
 
 export const KEYS = [
   "C",
@@ -40,6 +43,9 @@ export type ScaleId =
   | "mixolydianFlat6"
   | "locrianSharp2"
   | "altered"
+  | "quartal"
+  | "quintal"
+  | "sextal"
   | "hirajoshi"
   | "harmonicMinor"
   | "wholeTone"
@@ -61,6 +67,7 @@ export interface ScaleDefinition {
   id: ScaleId;
   label: string;
   intervals: readonly number[] | null;
+  stepSemitones?: number;
 }
 
 export const SCALE_DEFINITIONS: ScaleDefinition[] = [
@@ -98,6 +105,9 @@ export const SCALE_DEFINITIONS: ScaleDefinition[] = [
   { id: "mixolydianFlat6", label: "MIX b6", intervals: [0, 2, 4, 5, 7, 8, 10] },
   { id: "locrianSharp2", label: "LOC #2", intervals: [0, 2, 3, 5, 6, 8, 10] },
   { id: "altered", label: "ALTERED", intervals: [0, 1, 3, 4, 6, 8, 10] },
+  { id: "quartal", label: "QUARTAL", intervals: [], stepSemitones: 5 },
+  { id: "quintal", label: "QUINTAL", intervals: [], stepSemitones: 7 },
+  { id: "sextal", label: "SEXTAL", intervals: [], stepSemitones: 9 },
   { id: "custom", label: "CUSTOM", intervals: null }
 ];
 
@@ -120,19 +130,40 @@ export function getScaleDefinition(scaleId: ScaleId): ScaleDefinition {
   return SCALE_DEFINITIONS.find((scale) => scale.id === scaleId) ?? SCALE_DEFINITIONS[0];
 }
 
-export function createScaleMask(scaleId: ScaleId): boolean[] {
+export function barCountForRange(range: InstrumentRange): number {
+  return range === "piano" ? PIANO_BAR_COUNT : range * 12;
+}
+
+export function labelForInstrumentRange(range: InstrumentRange): string {
+  return range === "piano" ? "PIANO" : `${range} OCT`;
+}
+
+export function createScaleMask(scaleId: ScaleId, barCount = BAR_COUNT): boolean[] {
   const definition = getScaleDefinition(scaleId);
+  if (definition.stepSemitones) {
+    return createSteppedMask(definition.stepSemitones, barCount);
+  }
+
   if (!definition.intervals) {
-    return Array.from({ length: BAR_COUNT }, () => true);
+    return Array.from({ length: barCount }, () => true);
   }
 
   const intervalSet = new Set(definition.intervals.map((interval) => interval % 12));
-  return Array.from({ length: BAR_COUNT }, (_, index) => intervalSet.has(index % 12));
+  return Array.from({ length: barCount }, (_, index) => intervalSet.has(index % 12));
 }
 
-export function setPitchClassEnabled(mask: readonly boolean[], barIndex: number, enabled: boolean): boolean[] {
+function createSteppedMask(stepSemitones: number, barCount: number): boolean[] {
+  const enabled = new Set<number>();
+  for (let index = 0; index < barCount; index += stepSemitones) {
+    enabled.add(index);
+  }
+
+  return Array.from({ length: barCount }, (_, index) => enabled.has(index));
+}
+
+export function setPitchClassEnabled(mask: readonly boolean[], barIndex: number, enabled: boolean, barCount = mask.length): boolean[] {
   const pitchClass = barIndex % 12;
-  return Array.from({ length: BAR_COUNT }, (_, index) => (index % 12 === pitchClass ? enabled : Boolean(mask[index])));
+  return Array.from({ length: barCount }, (_, index) => (index % 12 === pitchClass ? enabled : Boolean(mask[index])));
 }
 
 export function getNextScaleId(scaleId: ScaleId, direction: 1 | -1): ScaleId {

@@ -2,13 +2,14 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import App from "./App";
 import HarpInstrument from "./components/HarpInstrument";
-import { keyKnobNorm } from "./components/harpGeometry";
+import { keyIndexFromPoint, keyKnobAngleDegrees } from "./components/harpGeometry";
 import { createScaleMask } from "./model/music";
 
 describe("App UI", () => {
   it("preserves the mockup viewBox and exposes 24 bars and toggles", () => {
     render(
       <HarpInstrument
+        barCount={24}
         enabledBars={createScaleMask("majorPentatonic")}
         scaleId="majorPentatonic"
         volume={0.5}
@@ -47,6 +48,7 @@ describe("App UI", () => {
     expect(screen.getByTestId("sustain-toggle")).toBeTruthy();
     expect(screen.getByTestId("slide-toggle")).toBeTruthy();
     expect(screen.getByTestId("split-octaves-toggle")).toBeTruthy();
+    expect(screen.getByText("UNIFY")).toBeTruthy();
   });
 
   it("cycles scales and marks manual toggles as custom", () => {
@@ -56,6 +58,37 @@ describe("App UI", () => {
     expect(screen.getByTestId("scale-label").textContent).toBe("PENT MIN");
     fireEvent.pointerDown(screen.getByTestId("bar-toggle-0"));
     expect(screen.getByTestId("scale-label").textContent).toBe("CUSTOM");
+  });
+
+  it("switches to a three-octave layout", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("tab", { name: "3 OCT" }));
+
+    expect(screen.getByTestId("harp-svg").getAttribute("viewBox")).toBe("0 0 402 214");
+    expect(screen.getByTestId("control-panel").getAttribute("x")).toBe("3");
+    expect(screen.getByTestId("control-panel").getAttribute("width")).toBe("396");
+    expect(screen.getAllByTestId(/strum-bar-/)).toHaveLength(36);
+    expect(screen.getAllByTestId(/bar-toggle-/)).toHaveLength(36);
+    expect(screen.getAllByTestId(/interval-dot-/)).toHaveLength(9);
+  });
+
+  it("switches down to one octave and up to a full piano-sized layout", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("tab", { name: "1 OCT" }));
+
+    expect(screen.getByTestId("harp-svg").getAttribute("viewBox")).toBe("0 0 270 214");
+    expect(screen.getByTestId("control-panel").getAttribute("width")).toBe("264");
+    expect(screen.getAllByTestId(/strum-bar-/)).toHaveLength(12);
+    expect(screen.getAllByTestId(/bar-toggle-/)).toHaveLength(12);
+    expect(screen.getAllByTestId(/interval-dot-/)).toHaveLength(3);
+
+    fireEvent.click(screen.getByRole("tab", { name: "PIANO" }));
+
+    expect(screen.getByTestId("harp-svg").getAttribute("viewBox")).toBe("0 0 974 214");
+    expect(screen.getByTestId("control-panel").getAttribute("width")).toBe("968");
+    expect(screen.getAllByTestId(/strum-bar-/)).toHaveLength(88);
+    expect(screen.getAllByTestId(/bar-toggle-/)).toHaveLength(88);
+    expect(screen.getAllByTestId(/interval-dot-/)).toHaveLength(21);
   });
 
   it("turns enabled toggle glow off when disabled", () => {
@@ -80,8 +113,14 @@ describe("App UI", () => {
     expect(screen.getByTestId("bar-toggle-12").querySelector("circle")?.getAttribute("data-state")).toBe("enabled");
   });
 
-  it("keeps the key indicator displaced to the matching label", () => {
-    expect(keyKnobNorm(0)).toBeCloseTo(2 / 11);
-    expect(keyKnobNorm(1)).toBeCloseTo(3 / 11);
+  it("spaces key selections in equal twelfths from straight up", () => {
+    const center = { x: 0, y: 0 };
+
+    expect(keyKnobAngleDegrees(0)).toBe(0);
+    expect(keyKnobAngleDegrees(1)).toBe(30);
+    expect(keyKnobAngleDegrees(11)).toBe(330);
+    expect(keyIndexFromPoint({ x: 0, y: -10 }, center)).toBe(0);
+    expect(keyIndexFromPoint({ x: 10, y: 0 }, center)).toBe(3);
+    expect(keyIndexFromPoint({ x: -10, y: 0 }, center)).toBe(9);
   });
 });

@@ -21,6 +21,7 @@ body,
 body {
   display: grid;
   min-width: 320px;
+  overflow-x: hidden;
   place-items: center;
   background-color: #f7f4ec;
   background-image: radial-gradient(circle, rgba(62, 62, 58, 0.22) 0.9px, transparent 1px);
@@ -30,27 +31,86 @@ body {
 .app-shell {
   width: 100%;
   min-height: 100vh;
+  min-height: 100svh;
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: 14px;
   background-color: #f7f4ec;
   background-image: radial-gradient(circle, rgba(62, 62, 58, 0.22) 0.9px, transparent 1px);
   background-size: 18px 18px;
 }
 
 .instrument-stage {
-  width: min(96vw, 1080px);
+  width: 100%;
+  min-width: 0;
   display: grid;
-  place-items: center;
+  justify-items: center;
+  align-content: center;
+  gap: 10px;
+}
+
+.instrument-scroll {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: visible;
+  padding-bottom: 6px;
+  overscroll-behavior-x: contain;
+}
+
+.instrument-scroll-inner {
+  width: max-content;
+  min-width: 100%;
+  display: grid;
+  justify-items: center;
 }
 
 .instrument-svg {
-  width: min(96vw, 980px);
+  --instrument-height-limit: calc(100svh - 76px);
+  width: auto;
+  width: min(
+    var(--instrument-display-width, 1120px),
+    calc(var(--instrument-height-limit) * var(--instrument-aspect-ratio, 1.261))
+  );
+  min-width: 0;
+  max-width: none;
   height: auto;
   display: block;
   touch-action: none;
   user-select: none;
   filter: drop-shadow(0 26px 34px rgba(0, 0, 0, 0.42));
+}
+
+.octave-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 3px;
+  width: min(100%, 620px);
+  padding: 3px;
+  border: 1px solid rgba(23, 23, 23, 0.28);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.62);
+  box-shadow: 0 8px 18px rgba(23, 23, 23, 0.12);
+}
+
+.octave-tab {
+  appearance: none;
+  border: 0;
+  border-radius: 5px;
+  flex: 1 1 58px;
+  min-height: 28px;
+  padding: 0 8px;
+  background: transparent;
+  color: #222222;
+  font: 700 11px/1 Inter, ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+.octave-tab-active {
+  background: #1f1f1f;
+  color: #f7f4ec;
 }
 
 svg [role="button"],
@@ -62,10 +122,10 @@ svg rect {
 
 @media (max-width: 560px) {
   .app-shell {
-    padding: 12px;
+    padding: 8px;
   }
 
   .instrument-svg {
-    width: 100vw;
+    --instrument-height-limit: calc(100svh - 96px);
   }
 }

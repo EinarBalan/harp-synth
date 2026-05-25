@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   BAR_COUNT,
+  barCountForRange,
   createScaleMask,
   frequencyForBar,
   getNextScaleId,
+  labelForInstrumentRange,
   midiForBar,
   setPitchClassEnabled
 } from "./music";
@@ -11,6 +13,24 @@ import {
 describe("music model", () => {
   it("creates 24-bar masks", () => {
     expect(createScaleMask("majorPentatonic")).toHaveLength(BAR_COUNT);
+  });
+
+  it("describes octave and piano-sized instrument ranges", () => {
+    expect(barCountForRange(1)).toBe(12);
+    expect(barCountForRange(7)).toBe(84);
+    expect(barCountForRange("piano")).toBe(88);
+    expect(labelForInstrumentRange(1)).toBe("1 OCT");
+    expect(labelForInstrumentRange("piano")).toBe("PIANO");
+  });
+
+  it("creates masks for extended layouts", () => {
+    const mask = createScaleMask("majorPentatonic", 36);
+    expect(mask).toHaveLength(36);
+    expect(mask.slice(24, 36)).toEqual(mask.slice(0, 12));
+
+    const pianoMask = createScaleMask("majorPentatonic", 88);
+    expect(pianoMask).toHaveLength(88);
+    expect(pianoMask.slice(72, 84)).toEqual(pianoMask.slice(0, 12));
   });
 
   it("maps major scale intervals across both octaves", () => {
@@ -229,11 +249,18 @@ describe("music model", () => {
     }
   });
 
+  it("maps quartal, quintal, and sextal presets as continuous stepped masks", () => {
+    expect(enabledIndices(createScaleMask("quartal", 24))).toEqual([0, 5, 10, 15, 20]);
+    expect(enabledIndices(createScaleMask("quintal", 24))).toEqual([0, 7, 14, 21]);
+    expect(enabledIndices(createScaleMask("sextal", 24))).toEqual([0, 9, 18]);
+  });
+
   it("cycles scale presets without selecting custom", () => {
     expect(getNextScaleId("wholeTone", 1)).toBe("tizita");
     expect(getNextScaleId("egyptian", 1)).toBe("dorian");
     expect(getNextScaleId("locrianSharp2", 1)).toBe("altered");
-    expect(getNextScaleId("altered", 1)).toBe("chromatic");
+    expect(getNextScaleId("altered", 1)).toBe("quartal");
+    expect(getNextScaleId("sextal", 1)).toBe("chromatic");
     expect(getNextScaleId("custom", 1)).toBe("major");
   });
 
@@ -252,5 +279,19 @@ describe("music model", () => {
     const disabled = setPitchClassEnabled(next, 4, false);
     expect(disabled[4]).toBe(false);
     expect(disabled[16]).toBe(false);
+
+    const threeOctave = setPitchClassEnabled(createScaleMask("majorPentatonic", 36), 1, true, 36);
+    expect(threeOctave[1]).toBe(true);
+    expect(threeOctave[13]).toBe(true);
+    expect(threeOctave[25]).toBe(true);
+
+    const piano = setPitchClassEnabled(createScaleMask("majorPentatonic", 88), 1, true, 88);
+    expect(piano[1]).toBe(true);
+    expect(piano[13]).toBe(true);
+    expect(piano[85]).toBe(true);
   });
 });
+
+function enabledIndices(mask: readonly boolean[]) {
+  return mask.flatMap((enabled, index) => (enabled ? [index] : []));
+}

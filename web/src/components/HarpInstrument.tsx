@@ -1,20 +1,19 @@
-import { useRef, type PointerEvent as ReactPointerEvent } from "react";
+import { useRef, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import mockupUrl from "../../Harp Synth.svg";
-import { BAR_COUNT, getScaleDefinition, KEYS, TONES, type ScaleId } from "../model/music";
-import { KEY_LABEL_SLOT_OFFSET, keyKnobNorm } from "./harpGeometry";
+import { getScaleDefinition, TONES, type ScaleId } from "../model/music";
+import { keyIndexFromPoint, keyKnobAngleDegrees } from "./harpGeometry";
 
 const SVG_WIDTH = 270;
 const SVG_HEIGHT = 214;
 const BAR_TOP = 64.5;
-const BAR_BOTTOM = 213.5;
 const BAR_WIDTH = 11;
-const FIRST_BAR_CENTER = 8.5;
 const BUTTON_Y = 59;
 const KNOB_MIN_ANGLE = -135;
 const KNOB_SWEEP = 270;
-const INTERVAL_DOT_BAR_INDICES = [4, 7, 11, 16, 19, 23];
+const DISPLAY_SCALE = 1120 / SVG_WIDTH;
 
 export interface HarpInstrumentProps {
+  barCount: number;
   enabledBars: boolean[];
   scaleId: ScaleId;
   volume: number;
@@ -50,15 +49,32 @@ interface SvgPoint {
 
 type KnobId = "key" | "tone" | "reverb";
 
-const barCenters = Array.from({ length: BAR_COUNT }, (_, index) => FIRST_BAR_CENTER + index * BAR_WIDTH);
-const knobCenters: Record<KnobId, SvgPoint> = {
-  key: { x: 109.5, y: 28 },
-  tone: { x: 144.5, y: 28 },
-  reverb: { x: 179.5, y: 28 }
-};
-
 export default function HarpInstrument(props: HarpInstrumentProps) {
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const barCount = props.barCount;
+  const svgWidth = getSvgWidth(barCount);
+  const barStartX = getBarStartX(svgWidth, barCount);
+  const barCenters = getBarCenters(barCount, barStartX);
+  const controlOffset = (svgWidth - SVG_WIDTH) / 2;
+  const rightEdge = barStartX + barCount * BAR_WIDTH;
+  const controlPanelX = Math.min(barStartX, controlOffset + 3);
+  const controlPanelRight = Math.max(rightEdge, controlOffset + SVG_WIDTH - 3);
+  const controlPanelWidth = controlPanelRight - controlPanelX;
+  const knobCenters: Record<KnobId, SvgPoint> = {
+    key: { x: controlOffset + 109.5, y: 28 },
+    tone: { x: controlOffset + 144.5, y: 28 },
+    reverb: { x: controlOffset + 179.5, y: 28 }
+  };
+  const intervalDotIndices = getIntervalDotIndices(barCount);
+  const svgStyle = {
+    "--instrument-aspect-ratio": String(svgWidth / SVG_HEIGHT),
+    "--instrument-display-height": `${SVG_HEIGHT * DISPLAY_SCALE}px`,
+    "--instrument-display-width": `${svgWidth * DISPLAY_SCALE}px`
+  } as CSSProperties;
+
+  function shiftX(x: number) {
+    return x + controlOffset;
+  }
 
   function clientToSvg(event: Pick<PointerEvent | ReactPointerEvent<SVGElement>, "clientX" | "clientY">): SvgPoint | null {
     const svg = svgRef.current;
@@ -79,13 +95,13 @@ export default function HarpInstrument(props: HarpInstrumentProps) {
       return null;
     }
 
-    const clampedX = clamp(point.x, 3, 267 - Number.EPSILON);
-    const directBar = Math.max(0, Math.min(BAR_COUNT - 1, Math.floor((clampedX - 3) / BAR_WIDTH)));
-    if (point.x >= 3 && point.x <= 267 && props.enabledBars[directBar]) {
+    const clampedX = clamp(point.x, barStartX, rightEdge - Number.EPSILON);
+    const directBar = Math.max(0, Math.min(barCount - 1, Math.floor((clampedX - barStartX) / BAR_WIDTH)));
+    if (point.x >= barStartX && point.x <= rightEdge && props.enabledBars[directBar]) {
       return directBar;
     }
 
-    return closestEnabledBar(point.x, props.enabledBars);
+    return closestEnabledBar(point.x, props.enabledBars, barCenters);
   }
 
   function handlePointerDown(event: ReactPointerEvent<SVGSVGElement>) {
@@ -147,14 +163,16 @@ export default function HarpInstrument(props: HarpInstrumentProps) {
         return;
       }
 
+      if (knob === "key") {
+        props.onKeyChange(keyIndexFromPoint(point, knobCenters.key));
+        return;
+      }
+
       const center = knobCenters[knob];
       const angle = (Math.atan2(point.y - center.y, point.x - center.x) * 180) / Math.PI;
       const norm = clamp((angle - KNOB_MIN_ANGLE) / KNOB_SWEEP, 0, 1);
 
-      if (knob === "key") {
-        const labelSlot = Math.round(norm * (KEYS.length - 1));
-        props.onKeyChange((labelSlot - KEY_LABEL_SLOT_OFFSET + KEYS.length) % KEYS.length);
-      } else if (knob === "tone") {
+      if (knob === "tone") {
         props.onToneChange(Math.round(norm * (TONES.length - 1)));
       } else {
         props.onReverbChange(norm);
@@ -182,7 +200,8 @@ export default function HarpInstrument(props: HarpInstrumentProps) {
     <svg
       ref={svgRef}
       className="instrument-svg"
-      viewBox={`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`}
+      viewBox={`0 0 ${svgWidth} ${SVG_HEIGHT}`}
+      style={svgStyle}
       role="img"
       aria-label="Harp synth prototype"
       data-testid="harp-svg"
@@ -205,9 +224,22 @@ export default function HarpInstrument(props: HarpInstrumentProps) {
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
+        <clipPath id="mockupControlsClip">
+          <rect x={shiftX(9.5)} y="10" width="250" height="34" rx="3" />
+        </clipPath>
       </defs>
 
-      <image href={mockupUrl} width={SVG_WIDTH} height={SVG_HEIGHT} />
+      <rect
+        x={controlPanelX}
+        y="0.5"
+        width={controlPanelWidth}
+        height="64"
+        fill="#1D1D1D"
+        stroke="black"
+        data-testid="control-panel"
+      />
+      <image href={mockupUrl} x={controlOffset} width={SVG_WIDTH} height={SVG_HEIGHT} clipPath="url(#mockupControlsClip)" />
+      <rect x={controlPanelX} y={BAR_TOP} width={controlPanelWidth} height={SVG_HEIGHT - BAR_TOP} fill="#1D1D1D" pointerEvents="none" />
 
       <g aria-hidden="true">
         {barCenters.map((center, index) => (
@@ -225,7 +257,7 @@ export default function HarpInstrument(props: HarpInstrumentProps) {
         ))}
       </g>
 
-      <rect x="0" y="50.2" width="270" height="17.6" fill="black" stroke="black" strokeWidth="0.4" />
+      <rect x={controlPanelX} y="50.2" width={controlPanelWidth} height="17.6" fill="black" stroke="black" strokeWidth="0.4" />
 
       <g>
         {barCenters.map((center, index) => {
@@ -265,21 +297,22 @@ export default function HarpInstrument(props: HarpInstrumentProps) {
       </g>
 
       <g aria-label="Volume slider" role="slider" aria-valuemin={0} aria-valuemax={1} aria-valuenow={props.volume}>
-        <rect x="44" y="8" width="10" height="38" fill="transparent" onPointerDown={(event) => handleSlider(event, "volume")} />
-        <rect x="47.5" y="12" width="3" height="30" fill="#2E2E2E" pointerEvents="none" />
-        <rect x="45" y={volumeY - 1} width="8" height="2" fill="#D9D9D9" stroke="black" strokeWidth="0.7" pointerEvents="none" />
+        <rect x={shiftX(44)} y="8" width="10" height="38" fill="transparent" onPointerDown={(event) => handleSlider(event, "volume")} />
+        <rect x={shiftX(47.5)} y="12" width="3" height="30" fill="#2E2E2E" pointerEvents="none" />
+        <rect x={shiftX(45)} y={volumeY - 1} width="8" height="2" fill="#D9D9D9" stroke="black" strokeWidth="0.7" pointerEvents="none" />
       </g>
 
       <g aria-label="Octave slider" role="slider" aria-valuemin={-2} aria-valuemax={2} aria-valuenow={props.octave}>
-        <rect x="65" y="8" width="10" height="38" fill="transparent" onPointerDown={(event) => handleSlider(event, "octave")} />
-        <rect x="68.5" y="12" width="3" height="30" fill="#2E2E2E" pointerEvents="none" />
-        <rect x="66" y={octaveY - 1} width="8" height="2" fill="#D9D9D9" stroke="black" strokeWidth="0.7" pointerEvents="none" />
+        <rect x={shiftX(65)} y="8" width="10" height="38" fill="transparent" onPointerDown={(event) => handleSlider(event, "octave")} />
+        <rect x={shiftX(68.5)} y="12" width="3" height="30" fill="#2E2E2E" pointerEvents="none" />
+        <rect x={shiftX(66)} y={octaveY - 1} width="8" height="2" fill="#D9D9D9" stroke="black" strokeWidth="0.7" pointerEvents="none" />
       </g>
 
       <Knob
         id="key"
         center={knobCenters.key}
-        norm={keyKnobNorm(props.keyIndex)}
+        norm={0}
+        indicatorDegreesFromUp={keyKnobAngleDegrees(props.keyIndex)}
         testId="key-knob"
         onPointerDown={(event) => handleKnob(event, "key")}
       />
@@ -300,9 +333,9 @@ export default function HarpInstrument(props: HarpInstrumentProps) {
       />
 
       <g aria-label="Scale selector">
-        <rect x="205.5" y="20" width="37" height="6" rx="1" fill="#444444" />
+        <rect x={shiftX(205.5)} y="20" width="37" height="6" rx="1" fill="#444444" />
         <text
-          x="224"
+          x={shiftX(224)}
           y="24.35"
           fill="white"
           fontFamily="Arial, sans-serif"
@@ -313,10 +346,10 @@ export default function HarpInstrument(props: HarpInstrumentProps) {
         >
           {scaleLabel}
         </text>
-        <path d="M246 20L248.165 22.25H243.835L246 20Z" fill="#393939" pointerEvents="none" />
-        <path d="M246 25L243.835 22.75H248.165L246 25Z" fill="#393939" pointerEvents="none" />
+        <path d={`M${shiftX(246)} 20L${shiftX(248.165)} 22.25H${shiftX(243.835)}L${shiftX(246)} 20Z`} fill="#393939" pointerEvents="none" />
+        <path d={`M${shiftX(246)} 25L${shiftX(243.835)} 22.75H${shiftX(248.165)}L${shiftX(246)} 25Z`} fill="#393939" pointerEvents="none" />
         <rect
-          x="241"
+          x={shiftX(241)}
           y="17.5"
           width="10"
           height="6"
@@ -330,7 +363,7 @@ export default function HarpInstrument(props: HarpInstrumentProps) {
           }}
         />
         <rect
-          x="241"
+          x={shiftX(241)}
           y="22.5"
           width="10"
           height="6"
@@ -346,9 +379,9 @@ export default function HarpInstrument(props: HarpInstrumentProps) {
       </g>
 
       <g>
-        <rect x="202" y="28" width="55" height="10.4" fill="#D9D9D9" />
+        <rect x={shiftX(202)} y="28" width="55" height="10.4" fill="#D9D9D9" />
         <ModeButton
-          x={207.5}
+          x={shiftX(207.5)}
           y={31}
           label="CHOR"
           active={props.chorus}
@@ -357,7 +390,7 @@ export default function HarpInstrument(props: HarpInstrumentProps) {
           onToggle={props.onChorusToggle}
         />
         <ModeButton
-          x={220}
+          x={shiftX(220)}
           y={31}
           label="SUSTAIN"
           active={props.sustain}
@@ -367,7 +400,7 @@ export default function HarpInstrument(props: HarpInstrumentProps) {
           compact
         />
         <ModeButton
-          x={232.5}
+          x={shiftX(232.5)}
           y={31}
           label="SLIDE"
           active={props.slide}
@@ -376,18 +409,18 @@ export default function HarpInstrument(props: HarpInstrumentProps) {
           onToggle={props.onSlideToggle}
         />
         <ModeButton
-          x={245}
+          x={shiftX(245)}
           y={31}
-          label="SPLIT"
-          active={props.splitOctaves}
+          label="UNIFY"
+          active={!props.splitOctaves}
           testId="split-octaves-toggle"
-          ariaLabel="Toggle split octave bar editing"
+          ariaLabel="Toggle unified octave bar editing"
           onToggle={props.onSplitOctavesToggle}
         />
       </g>
 
       <g aria-label="Interval indicators">
-        {INTERVAL_DOT_BAR_INDICES.map((index) => (
+        {intervalDotIndices.map((index) => (
           <circle
             key={index}
             cx={barCenters[index]}
@@ -421,6 +454,7 @@ function Knob({
   center,
   norm,
   testId,
+  indicatorDegreesFromUp,
   showStops = false,
   onPointerDown
 }: {
@@ -428,12 +462,11 @@ function Knob({
   center: SvgPoint;
   norm: number;
   testId: string;
+  indicatorDegreesFromUp?: number;
   showStops?: boolean;
   onPointerDown: (event: ReactPointerEvent<SVGElement>) => void;
 }) {
-  const angle = ((KNOB_MIN_ANGLE + norm * KNOB_SWEEP) * Math.PI) / 180;
-  const endX = center.x + Math.cos(angle) * 7;
-  const endY = center.y + Math.sin(angle) * 7;
+  const indicatorEnd = indicatorDegreesFromUp === undefined ? knobSweepEnd(center, norm, 7) : clockwiseFromUpEnd(center, indicatorDegreesFromUp, 7);
 
   return (
     <g data-testid={testId}>
@@ -443,8 +476,8 @@ function Knob({
       <line
         x1={center.x}
         y1={center.y}
-        x2={endX}
-        y2={endY}
+        x2={indicatorEnd.x}
+        y2={indicatorEnd.y}
         stroke="#555555"
         strokeWidth="2"
         strokeLinecap="round"
@@ -541,6 +574,22 @@ function tickPoints(center: SvgPoint, norm: number) {
   };
 }
 
+function knobSweepEnd(center: SvgPoint, norm: number, radius: number) {
+  const angle = ((KNOB_MIN_ANGLE + norm * KNOB_SWEEP) * Math.PI) / 180;
+  return {
+    x: center.x + Math.cos(angle) * radius,
+    y: center.y + Math.sin(angle) * radius
+  };
+}
+
+function clockwiseFromUpEnd(center: SvgPoint, degrees: number, radius: number) {
+  const angle = (degrees * Math.PI) / 180;
+  return {
+    x: center.x + Math.sin(angle) * radius,
+    y: center.y - Math.cos(angle) * radius
+  };
+}
+
 function sliderY(norm: number) {
   return 42 - clamp(norm, 0, 1) * 30;
 }
@@ -577,7 +626,34 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-function closestEnabledBar(x: number, enabledBars: readonly boolean[]) {
+function getBarCenters(barCount: number, startX: number) {
+  return Array.from({ length: barCount }, (_, index) => startX + BAR_WIDTH / 2 + index * BAR_WIDTH);
+}
+
+function getSvgWidth(barCount: number) {
+  return Math.max(SVG_WIDTH, barCount * BAR_WIDTH + 6);
+}
+
+function getBarStartX(svgWidth: number, barCount: number) {
+  return (svgWidth - barCount * BAR_WIDTH) / 2;
+}
+
+function getIntervalDotIndices(barCount: number) {
+  const indices: number[] = [];
+
+  for (let octaveStart = 0; octaveStart < barCount; octaveStart += 12) {
+    for (const interval of [4, 7, 11]) {
+      const index = octaveStart + interval;
+      if (index < barCount) {
+        indices.push(index);
+      }
+    }
+  }
+
+  return indices;
+}
+
+function closestEnabledBar(x: number, enabledBars: readonly boolean[], barCenters: readonly number[]) {
   let closestIndex: number | null = null;
   let closestDistance = Number.POSITIVE_INFINITY;
 

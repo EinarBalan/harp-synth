@@ -2,12 +2,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { HarpAudio } from "./audio/HarpAudio";
 import HarpInstrument from "./components/HarpInstrument";
 import {
+  barCountForRange,
   createScaleMask,
   frequencyForBar,
   getNextScaleId,
+  INSTRUMENT_RANGES,
   KEYS,
+  labelForInstrumentRange,
   setPitchClassEnabled,
   TONES,
+  type InstrumentRange,
   type ScaleId
 } from "./model/music";
 
@@ -17,6 +21,7 @@ export default function App() {
   const audioRef = useRef<HarpAudio | null>(null);
   const pointerDownRef = useRef(false);
   const activeBarRef = useRef<number | null>(null);
+  const [instrumentRange, setInstrumentRange] = useState<InstrumentRange>(2);
   const [enabledBars, setEnabledBars] = useState(() => createScaleMask("majorPentatonic"));
   const [scaleId, setScaleId] = useState<ScaleId>("majorPentatonic");
   const [volume, setVolume] = useState(0.72);
@@ -32,6 +37,7 @@ export default function App() {
 
   const key = KEYS[keyIndex];
   const tone = TONES[toneIndex];
+  const barCount = barCountForRange(instrumentRange);
 
   const params = useMemo(
     () => ({
@@ -161,7 +167,7 @@ export default function App() {
     setScaleId("custom");
     setEnabledBars((bars) => {
       if (!splitOctaves) {
-        return setPitchClassEnabled(bars, barIndex, targetEnabled);
+        return setPitchClassEnabled(bars, barIndex, targetEnabled, barCount);
       }
 
       const next = [...bars];
@@ -173,7 +179,7 @@ export default function App() {
   function stepScale(direction: 1 | -1) {
     const nextScaleId = getNextScaleId(scaleId, direction);
     setScaleId(nextScaleId);
-    setEnabledBars(createScaleMask(nextScaleId));
+    setEnabledBars(createScaleMask(nextScaleId, barCount));
     pointerDownRef.current = false;
     stopActiveNote();
   }
@@ -185,37 +191,74 @@ export default function App() {
     setSustain((value) => !value);
   }
 
+  function setInstrumentLayout(nextRange: InstrumentRange) {
+    if (nextRange === instrumentRange) {
+      return;
+    }
+
+    const nextBarCount = barCountForRange(nextRange);
+    pointerDownRef.current = false;
+    stopActiveNote();
+    setInstrumentRange(nextRange);
+    setEnabledBars((bars) => {
+      if (scaleId !== "custom") {
+        return createScaleMask(scaleId, nextBarCount);
+      }
+
+      return Array.from({ length: nextBarCount }, (_, index) => bars[index] ?? Boolean(bars[index % 12]));
+    });
+  }
+
   return (
     <main className="app-shell">
       <section className="instrument-stage" aria-label="Harp synth">
-        <HarpInstrument
-          enabledBars={enabledBars}
-          scaleId={scaleId}
-          volume={volume}
-          octave={octave}
-          keyIndex={keyIndex}
-          toneIndex={toneIndex}
-          reverb={reverb}
-          chorus={chorus}
-          sustain={sustain}
-          slide={slide}
-          splitOctaves={splitOctaves}
-          activeBar={activeBar}
-          onBarPointerDown={beginBar}
-          onBarPointerMove={moveBar}
-          onPointerRelease={releasePointer}
-          onToggleBar={toggleBar}
-          onScaleStep={stepScale}
-          onVolumeChange={setVolume}
-          onOctaveChange={setOctave}
-          onKeyChange={setKeyIndex}
-          onToneChange={setToneIndex}
-          onReverbChange={setReverb}
-          onChorusToggle={() => setChorus((value) => !value)}
-          onSustainToggle={toggleSustain}
-          onSlideToggle={() => setSlide((value) => !value)}
-          onSplitOctavesToggle={() => setSplitOctaves((value) => !value)}
-        />
+        <div className="instrument-scroll">
+          <div className="instrument-scroll-inner">
+            <HarpInstrument
+              barCount={barCount}
+              enabledBars={enabledBars}
+              scaleId={scaleId}
+              volume={volume}
+              octave={octave}
+              keyIndex={keyIndex}
+              toneIndex={toneIndex}
+              reverb={reverb}
+              chorus={chorus}
+              sustain={sustain}
+              slide={slide}
+              splitOctaves={splitOctaves}
+              activeBar={activeBar}
+              onBarPointerDown={beginBar}
+              onBarPointerMove={moveBar}
+              onPointerRelease={releasePointer}
+              onToggleBar={toggleBar}
+              onScaleStep={stepScale}
+              onVolumeChange={setVolume}
+              onOctaveChange={setOctave}
+              onKeyChange={setKeyIndex}
+              onToneChange={setToneIndex}
+              onReverbChange={setReverb}
+              onChorusToggle={() => setChorus((value) => !value)}
+              onSustainToggle={toggleSustain}
+              onSlideToggle={() => setSlide((value) => !value)}
+              onSplitOctavesToggle={() => setSplitOctaves((value) => !value)}
+            />
+          </div>
+        </div>
+        <div className="octave-tabs" role="tablist" aria-label="Instrument octave range">
+          {INSTRUMENT_RANGES.map((range) => (
+            <button
+              key={range}
+              type="button"
+              role="tab"
+              aria-selected={instrumentRange === range}
+              className={instrumentRange === range ? "octave-tab octave-tab-active" : "octave-tab"}
+              onClick={() => setInstrumentLayout(range)}
+            >
+              {labelForInstrumentRange(range)}
+            </button>
+          ))}
+        </div>
       </section>
     </main>
   );
