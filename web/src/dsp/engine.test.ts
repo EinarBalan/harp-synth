@@ -38,4 +38,22 @@ describe("HarpDsp", () => {
     }
     expect([...left, ...right].every((sample) => Number.isFinite(sample) && Math.abs(sample) <= 1)).toBe(true);
   });
+
+  it("supports 24 simultaneous note ids", () => {
+    const dsp = new HarpDsp(48000);
+    for (let noteId = 0; noteId < 24; noteId += 1) {
+      dsp.handleEvent({ type: "noteOn", noteId, frequency: 220 + noteId * 10, velocity: 1 });
+    }
+
+    expect(dsp.getActiveVoiceCount()).toBe(24);
+  });
+
+  it("rejects unknown note event types", () => {
+    const dsp = new HarpDsp(48000);
+    const unknownEvent = { type: "setParams", params: { volume: 0.5 } } as unknown as Parameters<
+      HarpDsp["handleEvent"]
+    >[0];
+
+    expect(() => dsp.handleEvent(unknownEvent)).toThrow("Unknown note event type: setParams");
+  });
 });

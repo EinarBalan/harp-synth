@@ -1,0 +1,3 @@
+- improve tones
+- make chords playable, currently clashing like crazy
+- improv reverb

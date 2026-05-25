@@ -20,10 +20,11 @@ describe("App UI", () => {
         reverb={0.2}
         chorus={false}
         sustain={false}
+        mono={false}
         slide={false}
         splitOctaves={false}
         showNoteLabels={false}
-        activeBar={null}
+        activeBars={new Set()}
         onBarPointerDown={() => undefined}
         onBarPointerMove={() => undefined}
         onPointerRelease={() => undefined}
@@ -36,6 +37,7 @@ describe("App UI", () => {
         onReverbChange={() => undefined}
         onChorusToggle={() => undefined}
         onSustainToggle={() => undefined}
+        onMonoToggle={() => undefined}
         onSlideToggle={() => undefined}
         onSplitOctavesToggle={() => undefined}
       />
@@ -48,16 +50,60 @@ describe("App UI", () => {
     expect(screen.getByTestId("reverb-stops")).toBeTruthy();
     expect(screen.getByTestId("chorus-toggle")).toBeTruthy();
     expect(screen.getByTestId("sustain-toggle")).toBeTruthy();
+    expect(screen.getByTestId("mono-toggle")).toBeTruthy();
     expect(screen.getByTestId("slide-toggle")).toBeTruthy();
     expect(screen.getByTestId("split-octaves-toggle")).toBeTruthy();
+    expect(screen.getByText("SUS")).toBeTruthy();
+    expect(screen.getByText("MONO")).toBeTruthy();
     expect(screen.getByText("UNIFY")).toBeTruthy();
+  });
+
+  it("can show multiple active bars at once", () => {
+    render(
+      <HarpInstrument
+        barCount={24}
+        enabledBars={createScaleMask("majorPentatonic")}
+        scaleId="majorPentatonic"
+        keyName="C"
+        volume={0.5}
+        octave={0}
+        keyIndex={0}
+        toneIndex={0}
+        reverb={0.2}
+        chorus={false}
+        sustain={false}
+        mono={false}
+        slide={false}
+        splitOctaves={false}
+        showNoteLabels={false}
+        activeBars={new Set([0, 2])}
+        onBarPointerDown={() => undefined}
+        onBarPointerMove={() => undefined}
+        onPointerRelease={() => undefined}
+        onToggleBar={() => undefined}
+        onScaleStep={() => undefined}
+        onVolumeChange={() => undefined}
+        onOctaveChange={() => undefined}
+        onKeyChange={() => undefined}
+        onToneChange={() => undefined}
+        onReverbChange={() => undefined}
+        onChorusToggle={() => undefined}
+        onSustainToggle={() => undefined}
+        onMonoToggle={() => undefined}
+        onSlideToggle={() => undefined}
+        onSplitOctavesToggle={() => undefined}
+      />
+    );
+
+    expect(screen.getByTestId("bar-visual-0").getAttribute("fill")).toBe("#BDE7FF");
+    expect(screen.getByTestId("bar-visual-2").getAttribute("fill")).toBe("#BDE7FF");
   });
 
   it("cycles scales and marks manual toggles as custom", () => {
     render(<App />);
-    expect(screen.getByTestId("scale-label").textContent).toBe("PENT MAJ");
+    expect(screen.getByTestId("scale-label").textContent).toBe("MAJ PENT");
     fireEvent.pointerDown(screen.getByTestId("scale-next"));
-    expect(screen.getByTestId("scale-label").textContent).toBe("PENT MIN");
+    expect(screen.getByTestId("scale-label").textContent).toBe("MIN PENT");
     fireEvent.pointerDown(screen.getByTestId("bar-toggle-0"));
     expect(screen.getByTestId("scale-label").textContent).toBe("CUSTOM");
   });
@@ -68,7 +114,45 @@ describe("App UI", () => {
 
     expect(screen.getByRole("dialog", { name: "How To Play" })).toBeTruthy();
     expect(screen.getByText(/Red bars indicate the root/)).toBeTruthy();
+    expect(screen.getByText("Shortcuts")).toBeTruthy();
+    expect(screen.getByText("Space toggles SUS. Arrow Up and Arrow Down change OCT.")).toBeTruthy();
     expect(screen.getByText(/UNIFY links matching bars across octaves/)).toBeTruthy();
+  });
+
+  it("toggles sustain with the Space key", () => {
+    render(<App />);
+    const sustainIndicator = screen.getByTestId("sustain-toggle").parentElement?.querySelector("circle");
+    expect(sustainIndicator?.getAttribute("data-state")).toBe("disabled");
+
+    fireEvent.keyDown(window, { code: "Space", key: " " });
+
+    expect(sustainIndicator?.getAttribute("data-state")).toBe("enabled");
+  });
+
+  it("does not toggle a focused bar with the Space key", () => {
+    render(<App />);
+    const sustainIndicator = screen.getByTestId("sustain-toggle").parentElement?.querySelector("circle");
+    const barToggle = screen.getByTestId("bar-toggle-0");
+    const barIndicator = barToggle.querySelector("circle");
+
+    expect(barIndicator?.getAttribute("data-state")).toBe("enabled");
+    fireEvent.keyDown(barToggle, { code: "Space", key: " " });
+
+    expect(sustainIndicator?.getAttribute("data-state")).toBe("enabled");
+    expect(barIndicator?.getAttribute("data-state")).toBe("enabled");
+  });
+
+  it("changes octave with Arrow Up and Arrow Down", () => {
+    render(<App />);
+    const octaveSlider = screen.getByRole("slider", { name: "Octave slider" });
+    expect(octaveSlider.getAttribute("aria-valuenow")).toBe("0");
+
+    fireEvent.keyDown(window, { code: "ArrowUp", key: "ArrowUp" });
+    expect(octaveSlider.getAttribute("aria-valuenow")).toBe("1");
+
+    fireEvent.keyDown(window, { code: "ArrowDown", key: "ArrowDown" });
+    fireEvent.keyDown(window, { code: "ArrowDown", key: "ArrowDown" });
+    expect(octaveSlider.getAttribute("aria-valuenow")).toBe("-1");
   });
 
   it("toggles note names on enabled bars", () => {

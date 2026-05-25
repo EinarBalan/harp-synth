@@ -11,6 +11,8 @@ const BUTTON_Y = 59;
 const KNOB_MIN_ANGLE = -135;
 const KNOB_SWEEP = 270;
 const DISPLAY_SCALE = 1120 / SVG_WIDTH;
+const MODE_BUTTON_CENTER_X = 227;
+const MODE_BUTTON_SPACING = 9.5;
 
 export interface HarpInstrumentProps {
   barCount: number;
@@ -24,13 +26,14 @@ export interface HarpInstrumentProps {
   reverb: number;
   chorus: boolean;
   sustain: boolean;
+  mono: boolean;
   slide: boolean;
   splitOctaves: boolean;
   showNoteLabels: boolean;
-  activeBar: number | null;
-  onBarPointerDown: (barIndex: number | null) => void;
-  onBarPointerMove: (barIndex: number | null) => void;
-  onPointerRelease: () => void;
+  activeBars: ReadonlySet<number>;
+  onBarPointerDown: (pointerId: number, barIndex: number | null) => void;
+  onBarPointerMove: (pointerId: number, barIndex: number | null) => void;
+  onPointerRelease: (pointerId: number) => void;
   onToggleBar: (barIndex: number) => void;
   onScaleStep: (direction: 1 | -1) => void;
   onVolumeChange: (volume: number) => void;
@@ -40,6 +43,7 @@ export interface HarpInstrumentProps {
   onReverbChange: (reverb: number) => void;
   onChorusToggle: () => void;
   onSustainToggle: () => void;
+  onMonoToggle: () => void;
   onSlideToggle: () => void;
   onSplitOctavesToggle: () => void;
 }
@@ -113,7 +117,7 @@ export default function HarpInstrument(props: HarpInstrumentProps) {
     }
 
     event.currentTarget.setPointerCapture(event.pointerId);
-    props.onBarPointerDown(barIndex);
+    props.onBarPointerDown(event.pointerId, barIndex);
   }
 
   function handlePointerMove(event: ReactPointerEvent<SVGSVGElement>) {
@@ -121,7 +125,7 @@ export default function HarpInstrument(props: HarpInstrumentProps) {
       return;
     }
 
-    props.onBarPointerMove(barIndexFromPoint(clientToSvg(event), true));
+    props.onBarPointerMove(event.pointerId, barIndexFromPoint(clientToSvg(event), true));
   }
 
   function handleSlider(event: ReactPointerEvent<SVGElement>, slider: "volume" | "octave") {
@@ -209,9 +213,9 @@ export default function HarpInstrument(props: HarpInstrumentProps) {
       data-testid="harp-svg"
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
-      onPointerUp={props.onPointerRelease}
-      onPointerCancel={props.onPointerRelease}
-      onLostPointerCapture={props.onPointerRelease}
+      onPointerUp={(event) => props.onPointerRelease(event.pointerId)}
+      onPointerCancel={(event) => props.onPointerRelease(event.pointerId)}
+      onLostPointerCapture={(event) => props.onPointerRelease(event.pointerId)}
     >
       <defs>
         <filter id="enabledToggleGlow" x="-100%" y="-100%" width="300%" height="300%">
@@ -251,7 +255,7 @@ export default function HarpInstrument(props: HarpInstrumentProps) {
             y={BAR_TOP}
             width={11}
             height={149}
-            fill={barFill(index, props.activeBar === index, props.enabledBars[index])}
+            fill={barFill(index, props.activeBars.has(index), props.enabledBars[index])}
             stroke="black"
             strokeWidth={1}
             data-testid={`bar-visual-${index}`}
@@ -276,7 +280,7 @@ export default function HarpInstrument(props: HarpInstrumentProps) {
                 props.onToggleBar(index);
               }}
               onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
+                if (event.key === "Enter") {
                   event.preventDefault();
                   props.onToggleBar(index);
                 }
@@ -383,7 +387,7 @@ export default function HarpInstrument(props: HarpInstrumentProps) {
       <g>
         <rect x={shiftX(202)} y="28" width="55" height="10.4" fill="#D9D9D9" />
         <ModeButton
-          x={shiftX(207.5)}
+          x={shiftX(MODE_BUTTON_CENTER_X - MODE_BUTTON_SPACING * 2)}
           y={31}
           label="CHOR"
           active={props.chorus}
@@ -392,9 +396,9 @@ export default function HarpInstrument(props: HarpInstrumentProps) {
           onToggle={props.onChorusToggle}
         />
         <ModeButton
-          x={shiftX(220)}
+          x={shiftX(MODE_BUTTON_CENTER_X - MODE_BUTTON_SPACING)}
           y={31}
-          label="SUSTAIN"
+          label="SUS"
           active={props.sustain}
           testId="sustain-toggle"
           ariaLabel="Toggle sustain"
@@ -402,7 +406,17 @@ export default function HarpInstrument(props: HarpInstrumentProps) {
           compact
         />
         <ModeButton
-          x={shiftX(232.5)}
+          x={shiftX(MODE_BUTTON_CENTER_X)}
+          y={31}
+          label="MONO"
+          active={props.mono}
+          testId="mono-toggle"
+          ariaLabel="Toggle mono voice mode"
+          onToggle={props.onMonoToggle}
+          compact
+        />
+        <ModeButton
+          x={shiftX(MODE_BUTTON_CENTER_X + MODE_BUTTON_SPACING)}
           y={31}
           label="SLIDE"
           active={props.slide}
@@ -411,7 +425,7 @@ export default function HarpInstrument(props: HarpInstrumentProps) {
           onToggle={props.onSlideToggle}
         />
         <ModeButton
-          x={shiftX(245)}
+          x={shiftX(MODE_BUTTON_CENTER_X + MODE_BUTTON_SPACING * 2)}
           y={31}
           label="UNIFY"
           active={!props.splitOctaves}

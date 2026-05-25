@@ -15,8 +15,7 @@ export interface DspParams {
 export type NoteEvent =
   | { type: "noteOn"; noteId: number; frequency: number; velocity: number }
   | { type: "noteOff"; noteId: number }
-  | { type: "glide"; noteId: number; frequency: number }
-  | { type: "setParams"; params: Partial<DspParams> };
+  | { type: "glide"; noteId: number; frequency: number };
 
 type EnvelopeState = "idle" | "attack" | "sustain" | "release";
 
@@ -84,22 +83,21 @@ export class HarpDsp {
   }
 
   handleEvent(event: NoteEvent) {
-    if (event.type === "setParams") {
-      this.setParams(event.params);
-      return;
+    switch (event.type) {
+      case "noteOn":
+        this.noteOn(event.noteId, event.frequency, event.velocity);
+        return;
+      case "noteOff":
+        this.noteOff(event.noteId);
+        return;
+      case "glide":
+        this.glide(event.noteId, event.frequency);
+        return;
+      default: {
+        const eventType = (event as { type?: unknown }).type;
+        throw new Error(`Unknown note event type: ${String(eventType)}`);
+      }
     }
-
-    if (event.type === "noteOn") {
-      this.noteOn(event.noteId, event.frequency, event.velocity);
-      return;
-    }
-
-    if (event.type === "noteOff") {
-      this.noteOff(event.noteId);
-      return;
-    }
-
-    this.glide(event.noteId, event.frequency);
   }
 
   process(left: Float32Array, right: Float32Array) {

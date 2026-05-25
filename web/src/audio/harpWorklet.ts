@@ -1,4 +1,5 @@
 import { createDefaultParams, HarpDsp, type DspParams, type NoteEvent } from "../dsp/engine";
+import { HARP_WORKLET_NAME } from "./constants";
 
 declare const sampleRate: number;
 declare class AudioWorkletProcessor {
@@ -39,4 +40,4 @@ class HarpSynthProcessor extends AudioWorkletProcessor {
   }
 }
 
-registerProcessor("harp-synth", HarpSynthProcessor);
+registerProcessor(HARP_WORKLET_NAME, HarpSynthProcessor);

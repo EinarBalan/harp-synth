@@ -1,4 +1,5 @@
 import type { DspParams, NoteEvent } from "../dsp/engine";
+import { HARP_WORKLET_NAME } from "./constants";
 import workletUrl from "./harpWorklet.ts?worker&url";
 
 type PendingMessage =
@@ -35,7 +36,7 @@ export class HarpAudio {
   private async initialize() {
     const context = new AudioContext();
     await context.audioWorklet.addModule(workletUrl);
-    const node = new AudioWorkletNode(context, "harp-synth", {
+    const node = new AudioWorkletNode(context, HARP_WORKLET_NAME, {
       numberOfInputs: 0,
       numberOfOutputs: 1,
       outputChannelCount: [2]
