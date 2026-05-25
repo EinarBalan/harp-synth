@@ -25,6 +25,7 @@ export interface HarpInstrumentProps {
   chorus: boolean;
   sustain: boolean;
   slide: boolean;
+  splitOctaves: boolean;
   activeBar: number | null;
   onBarPointerDown: (barIndex: number | null) => void;
   onBarPointerMove: (barIndex: number | null) => void;
@@ -39,6 +40,7 @@ export interface HarpInstrumentProps {
   onChorusToggle: () => void;
   onSustainToggle: () => void;
   onSlideToggle: () => void;
+  onSplitOctavesToggle: () => void;
 }
 
 interface SvgPoint {
@@ -344,10 +346,10 @@ export default function HarpInstrument(props: HarpInstrumentProps) {
       </g>
 
       <g>
-        <rect x="203" y="28" width="49" height="10.4" fill="#D9D9D9" />
+        <rect x="202" y="28" width="55" height="10.4" fill="#D9D9D9" />
         <ModeButton
           x={207.5}
-          y={31.2}
+          y={31}
           label="CHOR"
           active={props.chorus}
           testId="chorus-toggle"
@@ -355,8 +357,8 @@ export default function HarpInstrument(props: HarpInstrumentProps) {
           onToggle={props.onChorusToggle}
         />
         <ModeButton
-          x={224}
-          y={31.2}
+          x={220}
+          y={31}
           label="SUSTAIN"
           active={props.sustain}
           testId="sustain-toggle"
@@ -365,13 +367,22 @@ export default function HarpInstrument(props: HarpInstrumentProps) {
           compact
         />
         <ModeButton
-          x={240.5}
-          y={31.2}
+          x={232.5}
+          y={31}
           label="SLIDE"
           active={props.slide}
           testId="slide-toggle"
           ariaLabel="Toggle slide"
           onToggle={props.onSlideToggle}
+        />
+        <ModeButton
+          x={245}
+          y={31}
+          label="SPLIT"
+          active={props.splitOctaves}
+          testId="split-octaves-toggle"
+          ariaLabel="Toggle split octave bar editing"
+          onToggle={props.onSplitOctavesToggle}
         />
       </g>
 
@@ -468,7 +479,7 @@ function ModeButton({
       <circle
         cx={x}
         cy={y}
-        r={active ? 2.35 : 1.8}
+        r={active ? 2.15 : 1.65}
         fill={active ? "#efefef" : "#444444"}
         stroke={active ? "#111" : "none"}
         data-state={active ? "enabled" : "disabled"}
@@ -478,7 +489,7 @@ function ModeButton({
         y="36.55"
         fill="black"
         fontFamily="Arial, sans-serif"
-        fontSize={compact ? 2.35 : 2.65}
+        fontSize={compact ? 2.05 : 2.25}
         fontWeight="600"
         textAnchor="middle"
         pointerEvents="none"
@@ -488,7 +499,7 @@ function ModeButton({
       <circle
         cx={x}
         cy={y}
-        r="5.3"
+        r="4.8"
         fill="transparent"
         role="button"
         aria-label={ariaLabel}

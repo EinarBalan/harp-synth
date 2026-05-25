@@ -27,6 +27,7 @@ export default function App() {
   const [chorus, setChorus] = useState(false);
   const [sustain, setSustain] = useState(false);
   const [slide, setSlide] = useState(false);
+  const [splitOctaves, setSplitOctaves] = useState(false);
   const [activeBar, setActiveBar] = useState<number | null>(null);
 
   const key = KEYS[keyIndex];
@@ -149,14 +150,24 @@ export default function App() {
   function toggleBar(barIndex: number) {
     const targetEnabled = !enabledBars[barIndex];
     const shouldRelease =
-      !targetEnabled && activeBarRef.current !== null && activeBarRef.current % 12 === barIndex % 12;
+      !targetEnabled &&
+      activeBarRef.current !== null &&
+      (splitOctaves ? activeBarRef.current === barIndex : activeBarRef.current % 12 === barIndex % 12);
 
     if (shouldRelease) {
       stopActiveNote();
     }
 
     setScaleId("custom");
-    setEnabledBars((bars) => setPitchClassEnabled(bars, barIndex, targetEnabled));
+    setEnabledBars((bars) => {
+      if (!splitOctaves) {
+        return setPitchClassEnabled(bars, barIndex, targetEnabled);
+      }
+
+      const next = [...bars];
+      next[barIndex] = targetEnabled;
+      return next;
+    });
   }
 
   function stepScale(direction: 1 | -1) {
@@ -188,6 +199,7 @@ export default function App() {
           chorus={chorus}
           sustain={sustain}
           slide={slide}
+          splitOctaves={splitOctaves}
           activeBar={activeBar}
           onBarPointerDown={beginBar}
           onBarPointerMove={moveBar}
@@ -202,6 +214,7 @@ export default function App() {
           onChorusToggle={() => setChorus((value) => !value)}
           onSustainToggle={toggleSustain}
           onSlideToggle={() => setSlide((value) => !value)}
+          onSplitOctavesToggle={() => setSplitOctaves((value) => !value)}
         />
       </section>
     </main>

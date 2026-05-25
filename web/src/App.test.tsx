@@ -19,6 +19,7 @@ describe("App UI", () => {
         chorus={false}
         sustain={false}
         slide={false}
+        splitOctaves={false}
         activeBar={null}
         onBarPointerDown={() => undefined}
         onBarPointerMove={() => undefined}
@@ -33,6 +34,7 @@ describe("App UI", () => {
         onChorusToggle={() => undefined}
         onSustainToggle={() => undefined}
         onSlideToggle={() => undefined}
+        onSplitOctavesToggle={() => undefined}
       />
     );
 
@@ -44,13 +46,14 @@ describe("App UI", () => {
     expect(screen.getByTestId("chorus-toggle")).toBeTruthy();
     expect(screen.getByTestId("sustain-toggle")).toBeTruthy();
     expect(screen.getByTestId("slide-toggle")).toBeTruthy();
+    expect(screen.getByTestId("split-octaves-toggle")).toBeTruthy();
   });
 
   it("cycles scales and marks manual toggles as custom", () => {
     render(<App />);
     expect(screen.getByTestId("scale-label").textContent).toBe("PENT MAJ");
     fireEvent.pointerDown(screen.getByTestId("scale-next"));
-    expect(screen.getByTestId("scale-label").textContent).toBe("MAJ BLUES");
+    expect(screen.getByTestId("scale-label").textContent).toBe("PENT MIN");
     fireEvent.pointerDown(screen.getByTestId("bar-toggle-0"));
     expect(screen.getByTestId("scale-label").textContent).toBe("CUSTOM");
   });
@@ -66,6 +69,15 @@ describe("App UI", () => {
     expect(screen.getByTestId("bar-toggle-12").querySelector("circle")?.getAttribute("data-state")).toBe("disabled");
     expect(screen.getByTestId("bar-visual-0").getAttribute("fill")).toBe("#9E6868");
     expect(screen.getByTestId("bar-visual-12").getAttribute("fill")).toBe("#9E6868");
+  });
+
+  it("can split octave toggle editing", () => {
+    render(<App />);
+    fireEvent.pointerDown(screen.getByTestId("split-octaves-toggle"));
+    fireEvent.pointerDown(screen.getByTestId("bar-toggle-0"));
+
+    expect(screen.getByTestId("bar-toggle-0").querySelector("circle")?.getAttribute("data-state")).toBe("disabled");
+    expect(screen.getByTestId("bar-toggle-12").querySelector("circle")?.getAttribute("data-state")).toBe("enabled");
   });
 
   it("keeps the key indicator displaced to the matching label", () => {

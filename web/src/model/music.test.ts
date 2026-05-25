@@ -89,8 +89,151 @@ describe("music model", () => {
     expect(mask.slice(12, 24)).toEqual(mask.slice(0, 12));
   });
 
+  it("maps the phrygian preset across both octaves", () => {
+    const mask = createScaleMask("phrygian");
+    expect(mask.slice(0, 12)).toEqual([
+      true,
+      true,
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      true,
+      false
+    ]);
+    expect(mask.slice(12, 24)).toEqual(mask.slice(0, 12));
+  });
+
+  it("maps the remaining mode presets across both octaves", () => {
+    const cases = [
+      {
+        scaleId: "lydian" as const,
+        firstOctave: [true, false, true, false, true, false, true, true, false, true, false, true]
+      },
+      {
+        scaleId: "mixolydian" as const,
+        firstOctave: [true, false, true, false, true, true, false, true, false, true, true, false]
+      },
+      {
+        scaleId: "locrian" as const,
+        firstOctave: [true, true, false, true, false, true, true, false, true, false, true, false]
+      }
+    ];
+
+    for (const { scaleId, firstOctave } of cases) {
+      const mask = createScaleMask(scaleId);
+      expect(mask.slice(0, 12)).toEqual(firstOctave);
+      expect(mask.slice(12, 24)).toEqual(firstOctave);
+    }
+  });
+
+  it("maps melodic minor and its modes across both octaves", () => {
+    const cases = [
+      {
+        scaleId: "melodicMinor" as const,
+        firstOctave: [true, false, true, true, false, true, false, true, false, true, false, true]
+      },
+      {
+        scaleId: "dorianFlat2" as const,
+        firstOctave: [true, true, false, true, false, true, false, true, false, true, true, false]
+      },
+      {
+        scaleId: "lydianAugmented" as const,
+        firstOctave: [true, false, true, false, true, false, true, false, true, true, false, true]
+      },
+      {
+        scaleId: "lydianDominant" as const,
+        firstOctave: [true, false, true, false, true, false, true, true, false, true, true, false]
+      },
+      {
+        scaleId: "mixolydianFlat6" as const,
+        firstOctave: [true, false, true, false, true, true, false, true, true, false, true, false]
+      },
+      {
+        scaleId: "locrianSharp2" as const,
+        firstOctave: [true, false, true, true, false, true, true, false, true, false, true, false]
+      },
+      {
+        scaleId: "altered" as const,
+        firstOctave: [true, true, false, true, true, false, true, false, true, false, true, false]
+      }
+    ];
+
+    for (const { scaleId, firstOctave } of cases) {
+      const mask = createScaleMask(scaleId);
+      expect(mask.slice(0, 12)).toEqual(firstOctave);
+      expect(mask.slice(12, 24)).toEqual(firstOctave);
+    }
+  });
+
+  it("maps the exotic scale presets across both octaves", () => {
+    const cases = [
+      {
+        scaleId: "tizita" as const,
+        firstOctave: [true, false, true, false, true, false, false, true, false, true, false, false]
+      },
+      {
+        scaleId: "ambassel" as const,
+        firstOctave: [true, true, false, false, false, true, false, true, true, false, false, false]
+      },
+      {
+        scaleId: "anchihoye" as const,
+        firstOctave: [true, false, false, true, false, false, true, true, false, false, false, true]
+      },
+      {
+        scaleId: "japaneseYo" as const,
+        firstOctave: [true, false, true, false, false, true, false, true, false, true, false, false]
+      },
+      {
+        scaleId: "insen" as const,
+        firstOctave: [true, true, false, false, false, true, false, true, false, false, true, false]
+      },
+      {
+        scaleId: "iwato" as const,
+        firstOctave: [true, true, false, false, false, true, true, false, false, false, true, false]
+      },
+      {
+        scaleId: "kumoi" as const,
+        firstOctave: [true, false, true, true, false, false, false, true, false, true, false, false]
+      },
+      {
+        scaleId: "hungarianMinor" as const,
+        firstOctave: [true, false, true, true, false, false, true, true, true, false, false, true]
+      },
+      {
+        scaleId: "hungarianMajor" as const,
+        firstOctave: [true, false, false, true, true, false, true, true, false, true, true, false]
+      },
+      {
+        scaleId: "doubleHarmonicMajor" as const,
+        firstOctave: [true, true, false, false, true, true, false, true, true, false, false, true]
+      },
+      {
+        scaleId: "persian" as const,
+        firstOctave: [true, true, false, false, true, true, true, false, true, false, false, true]
+      },
+      {
+        scaleId: "egyptian" as const,
+        firstOctave: [true, false, true, false, false, true, false, true, false, false, true, false]
+      }
+    ];
+
+    for (const { scaleId, firstOctave } of cases) {
+      const mask = createScaleMask(scaleId);
+      expect(mask.slice(0, 12)).toEqual(firstOctave);
+      expect(mask.slice(12, 24)).toEqual(firstOctave);
+    }
+  });
+
   it("cycles scale presets without selecting custom", () => {
-    expect(getNextScaleId("wholeTone", 1)).toBe("chromatic");
+    expect(getNextScaleId("wholeTone", 1)).toBe("tizita");
+    expect(getNextScaleId("egyptian", 1)).toBe("dorian");
+    expect(getNextScaleId("locrianSharp2", 1)).toBe("altered");
+    expect(getNextScaleId("altered", 1)).toBe("chromatic");
     expect(getNextScaleId("custom", 1)).toBe("major");
   });
 
