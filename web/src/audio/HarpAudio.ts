@@ -1,4 +1,5 @@
 import type { DspParams, NoteEvent } from "../dsp/engine";
+import workletUrl from "./harpWorklet.ts?worker&url";
 
 type PendingMessage =
   | { type: "params"; params: Partial<DspParams> }
@@ -33,7 +34,6 @@ export class HarpAudio {
 
   private async initialize() {
     const context = new AudioContext();
-    const workletUrl = new URL("./harpWorklet.ts", import.meta.url);
     await context.audioWorklet.addModule(workletUrl);
     const node = new AudioWorkletNode(context, "harp-synth", {
       numberOfInputs: 0,
