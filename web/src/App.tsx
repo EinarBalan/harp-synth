@@ -35,6 +35,7 @@ export default function App() {
   const [splitOctaves, setSplitOctaves] = useState(false);
   const [activeBar, setActiveBar] = useState<number | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [showNoteLabels, setShowNoteLabels] = useState(false);
 
   const key = KEYS[keyIndex];
   const tone = TONES[toneIndex];
@@ -227,9 +228,20 @@ export default function App() {
 
   return (
     <main className="app-shell">
-      <button type="button" className="help-button" aria-label="How to play" onClick={() => setHelpOpen(true)}>
-        <span aria-hidden="true">?</span>
-      </button>
+      <div className="utility-buttons">
+        <button type="button" className="utility-button" aria-label="How to play" onClick={() => setHelpOpen(true)}>
+          <span aria-hidden="true">?</span>
+        </button>
+        <button
+          type="button"
+          className={showNoteLabels ? "utility-button utility-button-active" : "utility-button"}
+          aria-label="Toggle note names"
+          aria-pressed={showNoteLabels}
+          onClick={() => setShowNoteLabels((value) => !value)}
+        >
+          <span aria-hidden="true">ABC</span>
+        </button>
+      </div>
 
       {helpOpen ? (
         <div className="help-backdrop" role="presentation" onPointerDown={() => setHelpOpen(false)}>
@@ -291,6 +303,7 @@ export default function App() {
               barCount={barCount}
               enabledBars={enabledBars}
               scaleId={scaleId}
+              keyName={key}
               volume={volume}
               octave={octave}
               keyIndex={keyIndex}
@@ -300,6 +313,7 @@ export default function App() {
               sustain={sustain}
               slide={slide}
               splitOctaves={splitOctaves}
+              showNoteLabels={showNoteLabels}
               activeBar={activeBar}
               onBarPointerDown={beginBar}
               onBarPointerMove={moveBar}

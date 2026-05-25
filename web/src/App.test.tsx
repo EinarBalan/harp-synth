@@ -12,6 +12,7 @@ describe("App UI", () => {
         barCount={24}
         enabledBars={createScaleMask("majorPentatonic")}
         scaleId="majorPentatonic"
+        keyName="C"
         volume={0.5}
         octave={0}
         keyIndex={0}
@@ -21,6 +22,7 @@ describe("App UI", () => {
         sustain={false}
         slide={false}
         splitOctaves={false}
+        showNoteLabels={false}
         activeBar={null}
         onBarPointerDown={() => undefined}
         onBarPointerMove={() => undefined}
@@ -67,6 +69,18 @@ describe("App UI", () => {
     expect(screen.getByRole("dialog", { name: "How To Play" })).toBeTruthy();
     expect(screen.getByText(/Red bars indicate the root/)).toBeTruthy();
     expect(screen.getByText(/UNIFY links matching bars across octaves/)).toBeTruthy();
+  });
+
+  it("toggles note names on enabled bars", () => {
+    render(<App />);
+    expect(screen.queryByTestId("note-label-0")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Toggle note names" }));
+
+    expect(screen.getByTestId("note-label-0").textContent).toBe("C");
+    expect(screen.getByTestId("note-label-2").textContent).toBe("D");
+    expect(screen.getByTestId("note-label-4").textContent).toBe("E");
+    expect(screen.queryByTestId("note-label-1")).toBeNull();
   });
 
   it("switches to a three-octave layout", () => {

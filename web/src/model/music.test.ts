@@ -7,6 +7,7 @@ import {
   getNextScaleId,
   labelForInstrumentRange,
   midiForBar,
+  noteNameForBar,
   setPitchClassEnabled
 } from "./music";
 
@@ -268,6 +269,14 @@ describe("music model", () => {
     expect(midiForBar(0, "C", 0)).toBe(60);
     expect(midiForBar(0, "G", 1)).toBe(79);
     expect(frequencyForBar(9, "C", 0)).toBeCloseTo(440, 4);
+  });
+
+  it("labels bars using the current key spelling", () => {
+    expect(noteNameForBar(0, "C")).toBe("C");
+    expect(noteNameForBar(2, "C")).toBe("D");
+    expect(noteNameForBar(4, "C")).toBe("E");
+    expect(noteNameForBar(1, "F")).toBe("Gb");
+    expect(noteNameForBar(1, "G")).toBe("G#");
   });
 
   it("toggles analogous pitch classes across both octaves", () => {

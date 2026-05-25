@@ -1,6 +1,6 @@
 import { useRef, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import mockupUrl from "../../Harp Synth.svg";
-import { getScaleDefinition, TONES, type ScaleId } from "../model/music";
+import { getScaleDefinition, noteNameForBar, TONES, type KeyName, type ScaleId } from "../model/music";
 import { keyIndexFromPoint, keyKnobAngleDegrees } from "./harpGeometry";
 
 const SVG_WIDTH = 270;
@@ -16,6 +16,7 @@ export interface HarpInstrumentProps {
   barCount: number;
   enabledBars: boolean[];
   scaleId: ScaleId;
+  keyName: KeyName;
   volume: number;
   octave: number;
   keyIndex: number;
@@ -25,6 +26,7 @@ export interface HarpInstrumentProps {
   sustain: boolean;
   slide: boolean;
   splitOctaves: boolean;
+  showNoteLabels: boolean;
   activeBar: number | null;
   onBarPointerDown: (barIndex: number | null) => void;
   onBarPointerMove: (barIndex: number | null) => void;
@@ -433,6 +435,28 @@ export default function HarpInstrument(props: HarpInstrumentProps) {
         ))}
       </g>
 
+      {props.showNoteLabels ? (
+        <g aria-label="Note names" pointerEvents="none">
+          {barCenters.map((center, index) =>
+            props.enabledBars[index] ? (
+              <text
+                key={center}
+                x={center}
+                y="202"
+                fill={noteLabelFill(index)}
+                fontFamily="Arial, sans-serif"
+                fontSize={noteNameForBar(index, props.keyName).length > 1 ? 4.6 : 5.1}
+                fontWeight="700"
+                textAnchor="middle"
+                data-testid={`note-label-${index}`}
+              >
+                {noteNameForBar(index, props.keyName)}
+              </text>
+            ) : null
+          )}
+        </g>
+      ) : null}
+
       <g aria-label="Bar hit areas">
         {barCenters.map((center, index) => (
           <rect
@@ -620,6 +644,10 @@ function barFill(index: number, active: boolean, enabled: boolean) {
   }
 
   return "#EDECEC";
+}
+
+function noteLabelFill(index: number) {
+  return index % 12 === 0 || index % 12 === 5 ? "white" : "#111111";
 }
 
 function clamp(value: number, min: number, max: number) {

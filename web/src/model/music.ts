@@ -126,6 +126,10 @@ export const ROOT_SEMITONES: Record<KeyName, number> = {
   B: 11
 };
 
+const SHARP_NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"] as const;
+const FLAT_NOTE_NAMES = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"] as const;
+const FLAT_KEYS = new Set<KeyName>(["Db", "Ab", "Eb", "Bb", "F"]);
+
 export function getScaleDefinition(scaleId: ScaleId): ScaleDefinition {
   return SCALE_DEFINITIONS.find((scale) => scale.id === scaleId) ?? SCALE_DEFINITIONS[0];
 }
@@ -186,4 +190,9 @@ export function frequencyForMidi(midi: number): number {
 
 export function frequencyForBar(barIndex: number, key: KeyName, octaveOffset: number): number {
   return frequencyForMidi(midiForBar(barIndex, key, octaveOffset));
+}
+
+export function noteNameForBar(barIndex: number, key: KeyName): string {
+  const names = FLAT_KEYS.has(key) ? FLAT_NOTE_NAMES : SHARP_NOTE_NAMES;
+  return names[(ROOT_SEMITONES[key] + barIndex) % 12];
 }
