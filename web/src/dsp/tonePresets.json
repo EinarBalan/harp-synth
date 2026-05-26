@@ -1,0 +1,51 @@
+[
+  {
+    "label": "retro",
+    "filterCutoff": "0.50",
+    "partials": [
+      { "waveform": "clampedSine", "gain": 0.8 }
+    ]
+  },
+  {
+    "label": "Harp",
+    "filterCutoff": 0.18,
+    "partials": [
+      { "waveform": "sine", "gain": 0.65 },
+      { "waveform": "triangle", "gain": 0.2 },
+      { "waveform": "sine", "ratio": 2, "phaseOffset": 0.3, "gain": 0.24 },
+      {
+        "waveform": "sine",
+        "ratio": 3,
+        "phaseOffset": 0.7,
+        "gain": 0.14,
+        "highFrequencyThreshold": 500,
+        "highFrequencyGain": 0.6
+      }
+    ]
+  },
+  {
+    "label": "Bright Saw",
+    "filterCutoff": 0.36,
+    "partials": [
+      { "waveform": "sine", "gain": 0.55 },
+      { "waveform": "saw", "gain": 0.25 },
+      { "waveform": "sine", "ratio": 2, "phaseOffset": 0.3, "gain": 0.24 }
+    ]
+  },
+  {
+    "filterCutoff": 0.27,
+    "partials": [
+      { "waveform": "sine", "gain": 0.65 },
+      { "waveform": "sine", "ratio": 2.01, "gain": 0.22 },
+      { "waveform": "sine", "ratio": 3.92, "gain": 0.13 }
+    ]
+  },
+  {
+    "label": "Muted",
+    "filterCutoff": 0.08,
+    "partials": [
+      { "waveform": "sine", "gain": 0.48 },
+      { "waveform": "triangle", "gain": 0.42 }
+    ]
+  }
+]

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { HarpDsp } from "./engine";
+import { TONE_PRESET_COUNT } from "./tones";
 
 describe("HarpDsp", () => {
   it("produces finite audio after note on", () => {
@@ -37,6 +38,20 @@ describe("HarpDsp", () => {
       dsp.process(left, right);
     }
     expect([...left, ...right].every((sample) => Number.isFinite(sample) && Math.abs(sample) <= 1)).toBe(true);
+  });
+
+  it("produces finite audio for every tone preset", () => {
+    for (let toneIndex = 0; toneIndex < TONE_PRESET_COUNT; toneIndex += 1) {
+      const dsp = new HarpDsp(48000, { toneIndex });
+      const left = new Float32Array(256);
+      const right = new Float32Array(256);
+
+      dsp.handleEvent({ type: "noteOn", noteId: 1, frequency: 440, velocity: 1 });
+      dsp.process(left, right);
+
+      expect(left.some((sample) => sample !== 0)).toBe(true);
+      expect([...left, ...right].every(Number.isFinite)).toBe(true);
+    }
   });
 
   it("supports 24 simultaneous note ids", () => {

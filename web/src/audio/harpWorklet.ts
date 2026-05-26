@@ -35,6 +35,8 @@ class HarpSynthProcessor extends AudioWorkletProcessor {
 
     const left = output[0];
     const right = output[1] ?? output[0];
+
+    // get waveform samples from dsp and write to output buffers; sample values indicate sound pressure 
     this.dsp.process(left, right);
     return true;
   }

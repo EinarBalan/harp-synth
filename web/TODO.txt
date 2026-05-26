@@ -1,3 +1,6 @@
 - improve tones
+    - tone editor 
 - make chords playable, currently clashing like crazy
-- improv reverb
+- improve reverb
+- improve chorus
+- wavetable for sin to improve efficiency on microcontroller

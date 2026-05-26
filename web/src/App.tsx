@@ -2,6 +2,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { HarpAudio } from "./audio/HarpAudio";
 import HarpInstrument from "./components/HarpInstrument";
 import {
+  DEFAULT_CHORUS,
+  DEFAULT_REVERB,
+  DEFAULT_SLIDE,
+  DEFAULT_TONE_INDEX,
+  DEFAULT_VOLUME,
+  MAX_VOICES
+} from "./dsp/config";
+import {
   barCountForRange,
   createScaleMask,
   frequencyForBar,
@@ -10,14 +18,13 @@ import {
   KEYS,
   labelForInstrumentRange,
   setPitchClassEnabled,
-  TONES,
   type InstrumentRange,
   type ScaleId
 } from "./model/music";
 
 const MONO_STRUM_NOTE_ID = 1;
 const POLY_NOTE_ID_OFFSET = 100;
-const MAX_POLY_VOICES = 24;
+const MAX_POLY_VOICES = MAX_VOICES;
 
 function noteIdForBar(barIndex: number) {
   return POLY_NOTE_ID_OFFSET + barIndex;
@@ -32,33 +39,32 @@ export default function App() {
   const [instrumentRange, setInstrumentRange] = useState<InstrumentRange>(2);
   const [enabledBars, setEnabledBars] = useState(() => createScaleMask("majorPentatonic"));
   const [scaleId, setScaleId] = useState<ScaleId>("majorPentatonic");
-  const [volume, setVolume] = useState(0.72);
+  const [volume, setVolume] = useState(DEFAULT_VOLUME);
   const [octave, setOctave] = useState(0);
   const [keyIndex, setKeyIndex] = useState(0);
-  const [toneIndex, setToneIndex] = useState(0);
-  const [reverb, setReverb] = useState(0.18);
-  const [chorus, setChorus] = useState(false);
+  const [toneIndex, setToneIndex] = useState(DEFAULT_TONE_INDEX);
+  const [reverb, setReverb] = useState(DEFAULT_REVERB);
+  const [chorus, setChorus] = useState(DEFAULT_CHORUS);
   const [sustain, setSustain] = useState(false);
   const [mono, setMono] = useState(false);
-  const [slide, setSlide] = useState(false);
+  const [slide, setSlide] = useState(DEFAULT_SLIDE);
   const [splitOctaves, setSplitOctaves] = useState(false);
   const [activeBars, setActiveBars] = useState<ReadonlySet<number>>(() => new Set());
   const [helpOpen, setHelpOpen] = useState(false);
   const [showNoteLabels, setShowNoteLabels] = useState(false);
 
   const key = KEYS[keyIndex];
-  const tone = TONES[toneIndex];
   const barCount = barCountForRange(instrumentRange);
 
   const params = useMemo(
     () => ({
       volume,
-      tone,
+      toneIndex,
       reverb,
       chorus,
       slide
     }),
-    [volume, tone, reverb, chorus, slide]
+    [volume, toneIndex, reverb, chorus, slide]
   );
 
   useEffect(() => {

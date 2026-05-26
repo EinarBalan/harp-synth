@@ -266,8 +266,11 @@ describe("music model", () => {
   });
 
   it("maps key, octave, and bar to midi/frequency", () => {
+    expect(midiForBar(0, "A", 0)).toBe(69);
     expect(midiForBar(0, "C", 0)).toBe(60);
     expect(midiForBar(0, "G", 1)).toBe(79);
+    expect(frequencyForBar(0, "C", 0)).toBeCloseTo(261.6256, 4);
+    expect(frequencyForBar(0, "A", 0)).toBeCloseTo(440, 4);
     expect(frequencyForBar(9, "C", 0)).toBeCloseTo(440, 4);
   });
 

@@ -1,6 +1,7 @@
 import { useRef, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import mockupUrl from "../../Harp Synth.svg";
-import { getScaleDefinition, noteNameForBar, TONES, type KeyName, type ScaleId } from "../model/music";
+import { TONE_PRESET_COUNT } from "../dsp/tones";
+import { getScaleDefinition, noteNameForBar, type KeyName, type ScaleId } from "../model/music";
 import { keyIndexFromPoint, keyKnobAngleDegrees } from "./harpGeometry";
 
 const SVG_WIDTH = 270;
@@ -8,6 +9,13 @@ const SVG_HEIGHT = 214;
 const BAR_TOP = 64.5;
 const BAR_WIDTH = 11;
 const BUTTON_Y = 59;
+const SLIDER_HIT_Y = 8;
+const SLIDER_HIT_HEIGHT = 38;
+const SLIDER_TRACK_Y = 12;
+const SLIDER_TRACK_HEIGHT = 30;
+const SLIDER_VALUE_TOP_Y = 12;
+const SLIDER_VALUE_BOTTOM_Y = 39;
+const SLIDER_HANDLE_HEIGHT = 2;
 const KNOB_MIN_ANGLE = -135;
 const KNOB_SWEEP = 270;
 const DISPLAY_SCALE = 1120 / SVG_WIDTH;
@@ -138,7 +146,7 @@ export default function HarpInstrument(props: HarpInstrumentProps) {
         return;
       }
 
-      const norm = clamp((42 - point.y) / 30, 0, 1);
+      const norm = sliderNormFromY(point.y);
       if (slider === "volume") {
         props.onVolumeChange(norm);
       } else {
@@ -179,7 +187,7 @@ export default function HarpInstrument(props: HarpInstrumentProps) {
       const norm = clamp((angle - KNOB_MIN_ANGLE) / KNOB_SWEEP, 0, 1);
 
       if (knob === "tone") {
-        props.onToneChange(Math.round(norm * (TONES.length - 1)));
+        props.onToneChange(Math.round(norm * (TONE_PRESET_COUNT - 1)));
       } else {
         props.onReverbChange(norm);
       }
@@ -303,15 +311,15 @@ export default function HarpInstrument(props: HarpInstrumentProps) {
       </g>
 
       <g aria-label="Volume slider" role="slider" aria-valuemin={0} aria-valuemax={1} aria-valuenow={props.volume}>
-        <rect x={shiftX(44)} y="8" width="10" height="38" fill="transparent" onPointerDown={(event) => handleSlider(event, "volume")} />
-        <rect x={shiftX(47.5)} y="12" width="3" height="30" fill="#2E2E2E" pointerEvents="none" />
-        <rect x={shiftX(45)} y={volumeY - 1} width="8" height="2" fill="#D9D9D9" stroke="black" strokeWidth="0.7" pointerEvents="none" />
+        <rect x={shiftX(44)} y={SLIDER_HIT_Y} width="10" height={SLIDER_HIT_HEIGHT} fill="transparent" onPointerDown={(event) => handleSlider(event, "volume")} />
+        <rect x={shiftX(47.5)} y={SLIDER_TRACK_Y} width="3" height={SLIDER_TRACK_HEIGHT} fill="#2E2E2E" pointerEvents="none" />
+        <rect x={shiftX(45)} y={volumeY - SLIDER_HANDLE_HEIGHT / 2} width="8" height={SLIDER_HANDLE_HEIGHT} fill="#D9D9D9" stroke="black" strokeWidth="0.7" pointerEvents="none" />
       </g>
 
       <g aria-label="Octave slider" role="slider" aria-valuemin={-2} aria-valuemax={2} aria-valuenow={props.octave}>
-        <rect x={shiftX(65)} y="8" width="10" height="38" fill="transparent" onPointerDown={(event) => handleSlider(event, "octave")} />
-        <rect x={shiftX(68.5)} y="12" width="3" height="30" fill="#2E2E2E" pointerEvents="none" />
-        <rect x={shiftX(66)} y={octaveY - 1} width="8" height="2" fill="#D9D9D9" stroke="black" strokeWidth="0.7" pointerEvents="none" />
+        <rect x={shiftX(65)} y={SLIDER_HIT_Y} width="10" height={SLIDER_HIT_HEIGHT} fill="transparent" onPointerDown={(event) => handleSlider(event, "octave")} />
+        <rect x={shiftX(68.5)} y={SLIDER_TRACK_Y} width="3" height={SLIDER_TRACK_HEIGHT} fill="#2E2E2E" pointerEvents="none" />
+        <rect x={shiftX(66)} y={octaveY - SLIDER_HANDLE_HEIGHT / 2} width="8" height={SLIDER_HANDLE_HEIGHT} fill="#D9D9D9" stroke="black" strokeWidth="0.7" pointerEvents="none" />
       </g>
 
       <Knob
@@ -325,7 +333,7 @@ export default function HarpInstrument(props: HarpInstrumentProps) {
       <Knob
         id="tone"
         center={knobCenters.tone}
-        norm={props.toneIndex / (TONES.length - 1)}
+        norm={props.toneIndex / (TONE_PRESET_COUNT - 1)}
         testId="tone-knob"
         onPointerDown={(event) => handleKnob(event, "tone")}
       />
@@ -629,7 +637,11 @@ function clockwiseFromUpEnd(center: SvgPoint, degrees: number, radius: number) {
 }
 
 function sliderY(norm: number) {
-  return 42 - clamp(norm, 0, 1) * 30;
+  return SLIDER_VALUE_BOTTOM_Y - clamp(norm, 0, 1) * (SLIDER_VALUE_BOTTOM_Y - SLIDER_VALUE_TOP_Y);
+}
+
+function sliderNormFromY(y: number) {
+  return clamp((SLIDER_VALUE_BOTTOM_Y - y) / (SLIDER_VALUE_BOTTOM_Y - SLIDER_VALUE_TOP_Y), 0, 1);
 }
 
 function barFill(index: number, active: boolean, enabled: boolean) {

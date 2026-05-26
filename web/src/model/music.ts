@@ -18,10 +18,7 @@ export const KEYS = [
   "F"
 ] as const;
 
-export const TONES = ["HARP", "BRIGHT", "BELL", "MUTED"] as const;
-
 export type KeyName = (typeof KEYS)[number];
-export type ToneName = (typeof TONES)[number];
 
 export type ScaleId =
   | "chromatic"
@@ -111,7 +108,10 @@ export const SCALE_DEFINITIONS: ScaleDefinition[] = [
   { id: "custom", label: "CUSTOM", intervals: null }
 ];
 
-export const ROOT_SEMITONES: Record<KeyName, number> = {
+const C4_MIDI = 60;
+const C4_FREQUENCY = 261.6255653005986;
+
+const KEY_SEMITONES_FROM_C: Record<KeyName, number> = {
   C: 0,
   "Db": 1,
   D: 2,
@@ -181,11 +181,11 @@ export function getNextScaleId(scaleId: ScaleId, direction: 1 | -1): ScaleId {
 }
 
 export function midiForBar(barIndex: number, key: KeyName, octaveOffset: number): number {
-  return 60 + ROOT_SEMITONES[key] + octaveOffset * 12 + barIndex;
+  return C4_MIDI + KEY_SEMITONES_FROM_C[key] + octaveOffset * 12 + barIndex;
 }
 
 export function frequencyForMidi(midi: number): number {
-  return 440 * 2 ** ((midi - 69) / 12);
+  return C4_FREQUENCY * 2 ** ((midi - C4_MIDI) / 12);
 }
 
 export function frequencyForBar(barIndex: number, key: KeyName, octaveOffset: number): number {
@@ -194,5 +194,5 @@ export function frequencyForBar(barIndex: number, key: KeyName, octaveOffset: nu
 
 export function noteNameForBar(barIndex: number, key: KeyName): string {
   const names = FLAT_KEYS.has(key) ? FLAT_NOTE_NAMES : SHARP_NOTE_NAMES;
-  return names[(ROOT_SEMITONES[key] + barIndex) % 12];
+  return names[(KEY_SEMITONES_FROM_C[key] + barIndex) % 12];
 }
