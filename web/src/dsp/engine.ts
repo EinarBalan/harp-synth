@@ -55,6 +55,7 @@ interface Voice {
   envelope: number;
   state: EnvelopeState;
   filterState: number;
+  partialPhases: number[];
 }
 
 interface DelayLine {
@@ -101,7 +102,8 @@ export class HarpDsp {
       velocity: 0,
       envelope: 0,
       state: "idle",
-      filterState: 0
+      filterState: 0,
+      partialPhases: []
     }));
     this.chorusLine = this.createDelayLine(CHORUS_DELAY_SECONDS);
     this.reverbLines = REVERB_DELAY_SECONDS.map((seconds) => this.createDelayLine(seconds));
@@ -170,6 +172,9 @@ export class HarpDsp {
     voice.frequency = frequency;
     voice.targetFrequency = frequency;
     voice.velocity = clamp(velocity, 0, 1);
+    voice.phase = 0;
+    voice.filterState = 0;
+    voice.partialPhases = this.tone.partials.map(() => 0);
     voice.state = "attack";
   }
 
@@ -207,14 +212,35 @@ export class HarpDsp {
     // Frequency is cycles per second; sampleRate is samples per second, so this increments phase by cycles per sample.
     voice.phase = wrapPhase(voice.phase + voice.frequency / sampleRate);
 
-    const raw = this.oscillator(voice.phase, voice.frequency);
+    const raw = this.oscillator(voice);
     const envelope = this.advanceEnvelope(voice);
     const filtered = this.applyToneFilter(voice, raw);
     return filtered * envelope * voice.velocity;
   }
 
-  private oscillator(phase: number, frequency: number) {
-    return this.tone.partials.reduce((sample, partial) => sample + oscillatorPartial(phase, frequency, partial), 0);
+  private oscillator(voice: Voice) {
+    this.syncPartialPhases(voice);
+
+    return this.tone.partials.reduce((sample, partial, index) => {
+      const partialFrequency = voice.frequency * (partial.ratio ?? 1);
+      if (partialFrequency >= this.params.sampleRate * 0.5) {
+        return sample;
+      }
+
+      const phaseIncrement = partialFrequency / this.params.sampleRate;
+      voice.partialPhases[index] = wrapPhase(voice.partialPhases[index] + phaseIncrement);
+      return sample + oscillatorPartial(voice.partialPhases[index], voice.frequency, partial, phaseIncrement);
+    }, 0);
+  }
+
+  private syncPartialPhases(voice: Voice) {
+    if (voice.partialPhases.length === this.tone.partials.length) {
+      return;
+    }
+
+    voice.partialPhases = this.tone.partials.map((partial, index) => {
+      return voice.partialPhases[index] ?? wrapPhase(voice.phase * (partial.ratio ?? 1));
+    });
   }
 
   private advanceEnvelope(voice: Voice) {

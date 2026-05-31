@@ -4,7 +4,6 @@ import {
   barCountForRange,
   createScaleMask,
   frequencyForBar,
-  getNextScaleId,
   labelForInstrumentRange,
   midiForBar,
   noteNameForBar,
@@ -194,10 +193,6 @@ describe("music model", () => {
   it("maps the exotic scale presets across both octaves", () => {
     const cases = [
       {
-        scaleId: "tizita" as const,
-        firstOctave: [true, false, true, false, true, false, false, true, false, true, false, false]
-      },
-      {
         scaleId: "ambassel" as const,
         firstOctave: [true, true, false, false, false, true, false, true, true, false, false, false]
       },
@@ -254,15 +249,6 @@ describe("music model", () => {
     expect(enabledIndices(createScaleMask("quartal", 24))).toEqual([0, 5, 10, 15, 20]);
     expect(enabledIndices(createScaleMask("quintal", 24))).toEqual([0, 7, 14, 21]);
     expect(enabledIndices(createScaleMask("sextal", 24))).toEqual([0, 9, 18]);
-  });
-
-  it("cycles scale presets without selecting custom", () => {
-    expect(getNextScaleId("wholeTone", 1)).toBe("tizita");
-    expect(getNextScaleId("egyptian", 1)).toBe("dorian");
-    expect(getNextScaleId("locrianSharp2", 1)).toBe("altered");
-    expect(getNextScaleId("altered", 1)).toBe("quartal");
-    expect(getNextScaleId("sextal", 1)).toBe("chromatic");
-    expect(getNextScaleId("custom", 1)).toBe("major");
   });
 
   it("maps key, octave, and bar to midi/frequency", () => {

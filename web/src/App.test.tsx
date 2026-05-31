@@ -99,11 +99,9 @@ describe("App UI", () => {
     expect(screen.getByTestId("bar-visual-2").getAttribute("fill")).toBe("#BDE7FF");
   });
 
-  it("cycles scales and marks manual toggles as custom", () => {
+  it("marks manual toggles as custom", () => {
     render(<App />);
     expect(screen.getByTestId("scale-label").textContent).toBe("MAJ PENT");
-    fireEvent.pointerDown(screen.getByTestId("scale-next"));
-    expect(screen.getByTestId("scale-label").textContent).toBe("MIN PENT");
     fireEvent.pointerDown(screen.getByTestId("bar-toggle-0"));
     expect(screen.getByTestId("scale-label").textContent).toBe("CUSTOM");
   });

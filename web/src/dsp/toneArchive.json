@@ -1,0 +1,79 @@
+[
+  {
+    "label": "retro",
+    "filterCutoff": "0.5",
+    "partials": [
+      { 
+        "waveform": "square",  
+        "gain": 0.5, 
+        "highFrequencyThreshold": 500, 
+        "highFrequencyGain": 0.25 
+      },
+      { 
+        "waveform": "sine",
+        "gain": 0.5
+      }
+    ]
+  },
+  {
+    "label": "Harp",
+    "filterCutoff": 0.18,
+    "partials": [
+      { "waveform": "sine", "gain": 0.65 },
+      { "waveform": "triangle", "gain": 0.2 },
+      { "waveform": "sine", "ratio": 2, "phaseOffset": 0.3, "gain": 0.24 },
+      {
+        "waveform": "sine",
+        "ratio": 3,
+        "phaseOffset": 0.7,
+        "gain": 0.14,
+        "highFrequencyThreshold": 500,
+        "highFrequencyGain": 0.6
+      }
+    ]
+  },
+  {
+    "label": "Piano",
+    "filterCutoff": 0.28,
+    "partials": [
+      { "waveform": "sine", "gain": 0.58 },
+      { "waveform": "triangle", "gain": 0.18 },
+      { "waveform": "sine", "ratio": 2.01, "phaseOffset": 0.1, "gain": 0.28 },
+      { "waveform": "sine", "ratio": 3.02, "phaseOffset": 0.35, "gain": 0.16 },
+      { "waveform": "sine", "ratio": 4.03, "phaseOffset": 0.55, "gain": 0.1 },
+      {
+        "waveform": "sine",
+        "ratio": 6.08,
+        "phaseOffset": 0.8,
+        "gain": 0.07,
+        "highFrequencyThreshold": 900,
+        "highFrequencyGain": 0.45
+      }
+    ]
+  },
+  {
+    "label": "Bright Saw",
+    "filterCutoff": 0.36,
+    "partials": [
+      { "waveform": "sine", "gain": 0.55 },
+      { "waveform": "saw", "gain": 0.25 },
+      { "waveform": "sine", "ratio": 2, "phaseOffset": 0.3, "gain": 0.24 }
+    ]
+  },
+  {
+    "filterCutoff": 0.27,
+    "partials": [
+      { "waveform": "sine", "gain": 0.65 },
+      { "waveform": "sine", "ratio": 2.01, "gain": 0.22 },
+      { "waveform": "sine", "ratio": 3.92, "gain": 0.13 }
+    ]
+  },
+  {
+    "label": "Muted",
+    "filterCutoff": 0.08,
+    "partials": [
+      { "waveform": "sine", "gain": 0.48 },
+      { "waveform": "triangle", "gain": 0.42 }
+    ]
+  }
+]

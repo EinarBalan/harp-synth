@@ -1,13 +1,13 @@
-import { CLAMPED_SINE_DRIVE, SINE_TABLE_SIZE, SOFT_CLIP_DRIVE } from "./config";
+import { CLAMPED_SINE_DRIVE, DEFAULT_SAMPLE_RATE, SINE_TABLE_SIZE, SOFT_CLIP_DRIVE } from "./config";
 import { type TonePartial } from "./tones";
 import { clamp } from "./utils";
 
 const TWO_PI = Math.PI * 2;
 const SINE_TABLE = createSineTable(SINE_TABLE_SIZE);
 
-export function oscillatorPartial(phase: number, frequency: number, partial: TonePartial) {
-  // Create overtone based on partial ratio.
-  const partialPhase = wrapPhase(phase * (partial.ratio ?? 1));
+export function oscillatorPartial(phase: number, frequency: number, partial: TonePartial, phaseIncrement?: number) {
+  const partialPhase = wrapPhase(phase + (partial.phaseOffset ?? 0) / TWO_PI);
+  const dt = phaseIncrement ?? Math.abs((frequency * (partial.ratio ?? 1)) / DEFAULT_SAMPLE_RATE);
 
   // Allows for dynamic filtering based on frequency.
   const gain =
@@ -20,14 +20,14 @@ export function oscillatorPartial(phase: number, frequency: number, partial: Ton
     case "triangle":
       return triangleWave(partialPhase) * gain;
     case "saw":
-      return sawWave(partialPhase) * gain;
+      return sawWave(partialPhase, dt) * gain;
     case "square":
-      return squareWave(partialPhase) * gain;
+      return squareWave(partialPhase, dt) * gain;
     case "clampedSine":
-      return clampedSineWave(partialPhase, partial.phaseOffset ?? 0) * gain;
+      return clampedSineWave(partialPhase) * gain;
     case "sine":
     default:
-      return sineWave(partialPhase, partial.phaseOffset ?? 0) * gain;
+      return sineWave(partialPhase) * gain;
   }
 }
 
@@ -52,16 +52,35 @@ function triangleWave(phase: number) {
   return 1 - 4 * Math.abs(Math.round(phase - 0.25) - (phase - 0.25));
 }
 
-function sawWave(phase: number) {
-  return phase * 2 - 1;
+function sawWave(phase: number, phaseIncrement: number) {
+  return phase * 2 - 1 - polyBlep(phase, phaseIncrement);
 }
 
-function squareWave(phase: number) {
-  return phase < 0.5 ? 1 : -1;
+function squareWave(phase: number, phaseIncrement: number) {
+  return (phase < 0.5 ? 1 : -1) + polyBlep(phase, phaseIncrement) - polyBlep(wrapPhase(phase + 0.5), phaseIncrement);
 }
 
-function clampedSineWave(phase: number, phaseOffset: number) {
-  return clamp(sineWave(phase, phaseOffset) * CLAMPED_SINE_DRIVE, -1, 1);
+function clampedSineWave(phase: number) {
+  return clamp(sineWave(phase) * CLAMPED_SINE_DRIVE, -1, 1);
+}
+
+function polyBlep(phase: number, phaseIncrement: number) {
+  const dt = clamp(phaseIncrement, 0, 0.5);
+  if (dt === 0) {
+    return 0;
+  }
+
+  if (phase < dt) {
+    const t = phase / dt;
+    return t + t - t * t - 1;
+  }
+
+  if (phase > 1 - dt) {
+    const t = (phase - 1) / dt;
+    return t * t + t + t + 1;
+  }
+
+  return 0;
 }
 
 export function lerp(a: number, b: number, t: number) {

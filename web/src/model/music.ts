@@ -46,7 +46,6 @@ export type ScaleId =
   | "hirajoshi"
   | "harmonicMinor"
   | "wholeTone"
-  | "tizita"
   | "ambassel"
   | "anchihoye"
   | "japaneseYo"
@@ -77,7 +76,6 @@ export const SCALE_DEFINITIONS: ScaleDefinition[] = [
   { id: "blues", label: "BLUES", intervals: [0, 3, 5, 6, 7, 10] },
   { id: "harmonicMinor", label: "HARM MIN", intervals: [0, 2, 3, 5, 7, 8, 11] },
   { id: "wholeTone", label: "WHOLE", intervals: [0, 2, 4, 6, 8, 10] },
-  { id: "tizita", label: "TIZITA", intervals: [0, 2, 4, 7, 9] },
   { id: "ambassel", label: "AMBASSL", intervals: [0, 1, 5, 7, 8] },
   { id: "anchihoye", label: "ANCHI", intervals: [0, 3, 6, 7, 11] },
   { id: "japaneseYo", label: "YO", intervals: [0, 2, 5, 7, 9] },
