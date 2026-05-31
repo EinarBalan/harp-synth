@@ -21,6 +21,7 @@ import {
   type InstrumentRange,
   type ScaleId
 } from "./model/music";
+import { useMidiInput } from "./input/useMidiInput";
 
 const MONO_STRUM_NOTE_ID = 1;
 const POLY_NOTE_ID_OFFSET = 100;
@@ -55,6 +56,15 @@ export default function App() {
 
   const key = KEYS[keyIndex];
   const barCount = barCountForRange(instrumentRange);
+
+  const midiInput = useMidiInput({
+    keyName: key,
+    octave,
+    barCount,
+    enabledBars,
+    onNoteStart: beginBar,
+    onNoteStop: releasePointer
+  });
 
   const params = useMemo(
     () => ({
@@ -163,12 +173,12 @@ export default function App() {
     return false;
   }
 
-  function sendNoteOn(noteId: number, barIndex: number) {
+  function sendNoteOn(noteId: number, barIndex: number, velocity = 0.92) {
     sendAudioEvent({
       type: "noteOn",
       noteId,
       frequency: frequencyForBar(barIndex, key, octave),
-      velocity: 0.92
+      velocity
     });
   }
 
@@ -184,15 +194,15 @@ export default function App() {
     });
   }
 
-  function startMonoNote(barIndex: number) {
+  function startMonoNote(barIndex: number, velocity = 0.92) {
     monoActiveBarRef.current = barIndex;
-    sendNoteOn(MONO_STRUM_NOTE_ID, barIndex);
+    sendNoteOn(MONO_STRUM_NOTE_ID, barIndex, velocity);
     syncActiveBars();
   }
 
-  function retriggerMonoNote(barIndex: number) {
+  function retriggerMonoNote(barIndex: number, velocity = 0.92) {
     monoActiveBarRef.current = barIndex;
-    sendNoteOn(MONO_STRUM_NOTE_ID, barIndex);
+    sendNoteOn(MONO_STRUM_NOTE_ID, barIndex, velocity);
     syncActiveBars();
   }
 
@@ -233,7 +243,7 @@ export default function App() {
     }
   }
 
-  function startPolyNote(barIndex: number, sync = true) {
+  function startPolyNote(barIndex: number, sync = true, velocity = 0.92) {
     if (activePolyBarsRef.current.has(barIndex)) {
       return;
     }
@@ -243,7 +253,7 @@ export default function App() {
     }
 
     activePolyBarsRef.current.add(barIndex);
-    sendNoteOn(noteIdForBar(barIndex), barIndex);
+    sendNoteOn(noteIdForBar(barIndex), barIndex, velocity);
     if (sync) {
       syncActiveBars();
     }
@@ -262,6 +272,7 @@ export default function App() {
   function stopAllNotes() {
     activePointerIdsRef.current.clear();
     activePointerBarsRef.current.clear();
+    midiInput.clearActiveNotes();
     stopMonoNote(false);
     stopAllPolyNotes(false);
     syncActiveBars();
@@ -305,20 +316,20 @@ export default function App() {
     }
   }
 
-  function playMonoBar(pointerId: number, barIndex: number) {
+  function playMonoBar(pointerId: number, barIndex: number, velocity = 0.92) {
     activePointerBarsRef.current.set(pointerId, barIndex);
     if (monoActiveBarRef.current === barIndex) {
       return;
     }
 
-    retriggerMonoNote(barIndex);
+    retriggerMonoNote(barIndex, velocity);
   }
 
-  function playSlideBar(pointerId: number, barIndex: number) {
+  function playSlideBar(pointerId: number, barIndex: number, velocity = 0.92) {
     activePointerBarsRef.current.set(pointerId, barIndex);
 
     if (monoActiveBarRef.current === null) {
-      startMonoNote(barIndex);
+      startMonoNote(barIndex, velocity);
       return;
     }
 
@@ -327,7 +338,7 @@ export default function App() {
     }
   }
 
-  function playPolyBar(pointerId: number, barIndex: number) {
+  function playPolyBar(pointerId: number, barIndex: number, velocity = 0.92) {
     const previousBarIndex = activePointerBarsRef.current.get(pointerId);
     if (previousBarIndex === barIndex) {
       return;
@@ -338,29 +349,29 @@ export default function App() {
     }
 
     activePointerBarsRef.current.set(pointerId, barIndex);
-    startPolyNote(barIndex, false);
+    startPolyNote(barIndex, false, velocity);
     syncActiveBars();
   }
 
-  function playBar(pointerId: number, barIndex: number) {
+  function playBar(pointerId: number, barIndex: number, velocity = 0.92) {
     if (slide) {
-      playSlideBar(pointerId, barIndex);
+      playSlideBar(pointerId, barIndex, velocity);
       return;
     }
 
     if (mono) {
-      playMonoBar(pointerId, barIndex);
+      playMonoBar(pointerId, barIndex, velocity);
       return;
     }
 
-    playPolyBar(pointerId, barIndex);
+    playPolyBar(pointerId, barIndex, velocity);
   }
 
-  function clearPointerBar(pointerId: number) {
+  function clearPointerBar(pointerId: number, forceStop = false) {
     const previousBarIndex = activePointerBarsRef.current.get(pointerId);
     activePointerBarsRef.current.delete(pointerId);
 
-    if (sustain || previousBarIndex === undefined) {
+    if (previousBarIndex === undefined || (sustain && !forceStop)) {
       return;
     }
 
@@ -389,7 +400,7 @@ export default function App() {
     }
   }
 
-  function beginBar(pointerId: number, barIndex: number | null) {
+  function beginBar(pointerId: number, barIndex: number | null, velocity = 0.92) {
     activePointerIdsRef.current.add(pointerId);
     if (barIndex === null || !enabledBars[barIndex]) {
       if (!sustain) {
@@ -398,7 +409,7 @@ export default function App() {
       return;
     }
 
-    playBar(pointerId, barIndex);
+    playBar(pointerId, barIndex, velocity);
   }
 
   function moveBar(pointerId: number, barIndex: number | null) {
@@ -418,8 +429,8 @@ export default function App() {
     playBar(pointerId, barIndex);
   }
 
-  function releasePointer(pointerId: number) {
-    clearPointerBar(pointerId);
+  function releasePointer(pointerId: number, forceStop = false) {
+    clearPointerBar(pointerId, forceStop);
     activePointerIdsRef.current.delete(pointerId);
   }
 
@@ -504,6 +515,24 @@ export default function App() {
           onClick={() => setShowNoteLabels((value) => !value)}
         >
           <span aria-hidden="true">ABC</span>
+        </button>
+        <button
+          type="button"
+          className={[
+            "utility-button",
+            "utility-button-midi",
+            midiInput.enabled ? "utility-button-active" : "",
+            midiInput.status === "requesting" ? "utility-button-pending" : "",
+            midiInput.status === "unsupported" || midiInput.status === "error" ? "utility-button-error" : ""
+          ]
+            .filter(Boolean)
+            .join(" ")}
+          aria-label={midiInput.buttonLabel}
+          aria-pressed={midiInput.enabled}
+          title={midiInput.buttonLabel}
+          onClick={midiInput.toggle}
+        >
+          <span aria-hidden="true">{midiInput.status === "requesting" ? "..." : "MIDI"}</span>
         </button>
       </div>
 

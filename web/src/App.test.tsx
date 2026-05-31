@@ -1,9 +1,25 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import HarpInstrument from "./components/HarpInstrument";
 import { keyIndexFromPoint, keyKnobAngleDegrees } from "./components/harpGeometry";
 import { createScaleMask } from "./model/music";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  Object.defineProperty(navigator, "requestMIDIAccess", {
+    configurable: true,
+    value: undefined
+  });
+  Object.defineProperty(globalThis, "AudioContext", {
+    configurable: true,
+    value: undefined
+  });
+  Object.defineProperty(globalThis, "AudioWorkletNode", {
+    configurable: true,
+    value: undefined
+  });
+});
 
 describe("App UI", () => {
   it("preserves the mockup viewBox and exposes 24 bars and toggles", () => {
@@ -163,6 +179,91 @@ describe("App UI", () => {
     expect(screen.getByTestId("note-label-2").textContent).toBe("D");
     expect(screen.getByTestId("note-label-4").textContent).toBe("E");
     expect(screen.queryByTestId("note-label-1")).toBeNull();
+  });
+
+  it("toggles MIDI input from the utility buttons", async () => {
+    const midiInput: { id: string; state: string; onmidimessage: ((event: { data: Uint8Array }) => void) | null } = {
+      id: "keyboard-1",
+      state: "connected",
+      onmidimessage: null
+    };
+    const midiAccess = {
+      inputs: new Map([[midiInput.id, midiInput]]),
+      onstatechange: null
+    };
+    Object.defineProperty(navigator, "requestMIDIAccess", {
+      configurable: true,
+      value: vi.fn().mockResolvedValue(midiAccess)
+    });
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Enable MIDI input" }));
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Disable MIDI input (1 input)" })).toBeTruthy());
+    expect(midiInput.onmidimessage).toEqual(expect.any(Function));
+
+    fireEvent.click(screen.getByRole("button", { name: "Disable MIDI input (1 input)" }));
+
+    expect(midiInput.onmidimessage).toBeNull();
+    expect(screen.getByRole("button", { name: "Enable MIDI input" })).toBeTruthy();
+  });
+
+  it("marks the MIDI toggle unavailable when Web MIDI is missing", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Enable MIDI input" }));
+
+    expect(screen.getByRole("button", { name: "MIDI input unavailable" }).getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("highlights enabled bars from MIDI note messages", async () => {
+    class FakeAudioContext {
+      audioWorklet = { addModule: vi.fn().mockResolvedValue(undefined) };
+      destination = {};
+      resume = vi.fn().mockResolvedValue(undefined);
+    }
+
+    class FakeAudioWorkletNode {
+      port = { postMessage: vi.fn() };
+      connect = vi.fn();
+    }
+
+    const midiInput: { id: string; state: string; onmidimessage: ((event: { data: Uint8Array }) => void) | null } = {
+      id: "keyboard-1",
+      state: "connected",
+      onmidimessage: null
+    };
+    const midiAccess = {
+      inputs: new Map([[midiInput.id, midiInput]]),
+      onstatechange: null
+    };
+    Object.defineProperty(globalThis, "AudioContext", {
+      configurable: true,
+      value: FakeAudioContext
+    });
+    Object.defineProperty(globalThis, "AudioWorkletNode", {
+      configurable: true,
+      value: FakeAudioWorkletNode
+    });
+    Object.defineProperty(navigator, "requestMIDIAccess", {
+      configurable: true,
+      value: vi.fn().mockResolvedValue(midiAccess)
+    });
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Enable MIDI input" }));
+    await waitFor(() => expect(midiInput.onmidimessage).toEqual(expect.any(Function)));
+
+    act(() => {
+      midiInput.onmidimessage?.({ data: new Uint8Array([0x90, 60, 100]) });
+    });
+
+    await waitFor(() => expect(screen.getByTestId("bar-visual-0").getAttribute("fill")).toBe("#BDE7FF"));
+
+    act(() => {
+      midiInput.onmidimessage?.({ data: new Uint8Array([0x80, 60, 0]) });
+    });
+
+    await waitFor(() => expect(screen.getByTestId("bar-visual-0").getAttribute("fill")).not.toBe("#BDE7FF"));
   });
 
   it("switches to a three-octave layout", () => {

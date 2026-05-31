@@ -17,6 +17,17 @@
     ]
   },
   {
+    "label": "Rich Harp",
+    "filterCutoff": 0.58,
+    "partials": [
+      { "waveform": "sine", "ratio": 0.667, "gain": 0.3 },
+      { "waveform": "sine", "ratio": 1.5, "gain": 0.3 },
+      { "waveform": "clampedSine", "gain": 0.48 },
+      { "waveform": "sine", "ratio": 2, "phaseOffset": 0.2, "gain": 0.2 },
+      { "waveform": "sine", "ratio": 5, "phaseOffset": 0.55, "gain": 0.09 }
+    ]
+  },
+  {
     "label": "Clav",
     "filterCutoff": 0.1,
     "partials": [
@@ -75,7 +86,32 @@
       { "waveform": "sine", "ratio": 2, "phaseOffset": 0.25, "gain": 0.08 }
     ]
   },
-    {
+  {
+    "label": "RichSupersaw",
+    "filterCutoff": 0.42,
+    "partials": [
+      { "waveform": "saw", "gain": 0.48 },
+      { "waveform": "saw", "ratio": 0.667, "gain": 0.35 },
+      { "waveform": "saw", "ratio": 1.5, "gain": 0.35 },
+      { "waveform": "saw", "ratio": 0.997, "phaseOffset": 0.18, "gain": 0.18 },
+      { "waveform": "saw", "ratio": 1.003, "phaseOffset": 0.43, "gain": 0.18 },
+      { "waveform": "saw", "ratio": 1.01, "phaseOffset": 0.71, "gain": 0.12 },
+      { "waveform": "sine", "ratio": 2, "phaseOffset": 0.25, "gain": 0.08 }
+    ]
+  },
+  {
+    "label": "Rich Retro",
+    "filterCutoff": 0.58,
+    "partials": [
+      { "waveform": "square", "ratio": 0.667, "gain": 0.35, "highFrequencyThreshold": 1000, "highFrequencyGain": 0.3 },
+      { "waveform": "saw", "ratio": 1.5, "gain": 0.35, "highFrequencyThreshold": 1000, "highFrequencyGain": 0.3 },
+      { "waveform": "clampedSine", "gain": 0.48 },
+      { "waveform": "saw", "gain": 0.26 },
+      { "waveform": "sine", "ratio": 2, "phaseOffset": 0.2, "gain": 0.2 },
+      { "waveform": "sine", "ratio": 5, "phaseOffset": 0.55, "gain": 0.09 }
+    ]
+  },
+  {
     "label": "THICK Punch",
     "filterCutoff": 0.58,
     "partials": [
