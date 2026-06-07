@@ -3,11 +3,9 @@ import {
   CHORUS_DRY_GAIN,
   CHORUS_DELAY_SECONDS,
   CHORUS_FEEDBACK_GAIN,
-  CHORUS_LEFT_DELAY_SECONDS,
-  CHORUS_LEFT_DEPTH_SECONDS,
-  CHORUS_RATE_HZ,
-  CHORUS_RIGHT_DELAY_SECONDS,
-  CHORUS_RIGHT_DEPTH_SECONDS,
+  CHORUS_RIGHT_PHASE_OFFSET,
+  CHORUS_VOICES,
+  CHORUS_WET_FILTER,
   CHORUS_WET_GAIN,
   DEFAULT_CHORUS,
   DEFAULT_REVERB,
@@ -21,8 +19,13 @@ import {
   MAX_VOICES,
   OUTPUT_GAIN,
   RELEASE_SECONDS,
+  REVERB_DAMPING,
   REVERB_DELAY_SECONDS,
-  REVERB_FEEDBACK
+  REVERB_DRY_GAIN_AT_MAX,
+  REVERB_FEEDBACK,
+  REVERB_RIGHT_DELAY_SECONDS,
+  REVERB_STEREO_CROSSFEED,
+  REVERB_WET_GAIN
 } from "./config";
 import { lerp, oscillatorPartial, sineWave, softClip, wrapPhase } from "./oscillator";
 import { clampToneIndex, getTonePreset, type TonePreset } from "./tones";
@@ -61,6 +64,7 @@ interface Voice {
 interface DelayLine {
   buffer: Float32Array;
   index: number;
+  filterState: number;
 }
 
 // Defaults
@@ -80,8 +84,11 @@ export class HarpDsp {
   private tone: TonePreset;
   private voices: Voice[];
   private chorusLine: DelayLine;
-  private chorusPhase = 0;
-  private reverbLines: DelayLine[];
+  private chorusPhases: number[];
+  private chorusLeftWet = 0;
+  private chorusRightWet = 0;
+  private reverbLeftLines: DelayLine[];
+  private reverbRightLines: DelayLine[];
   private reverbFeedback: readonly number[];
 
   constructor(sampleRate = DEFAULT_SAMPLE_RATE, params: Partial<DspParams> = {}) {
@@ -106,7 +113,9 @@ export class HarpDsp {
       partialPhases: []
     }));
     this.chorusLine = this.createDelayLine(CHORUS_DELAY_SECONDS);
-    this.reverbLines = REVERB_DELAY_SECONDS.map((seconds) => this.createDelayLine(seconds));
+    this.chorusPhases = CHORUS_VOICES.map((voice) => voice.phaseOffset);
+    this.reverbLeftLines = REVERB_DELAY_SECONDS.map((seconds) => this.createDelayLine(seconds));
+    this.reverbRightLines = REVERB_RIGHT_DELAY_SECONDS.map((seconds) => this.createDelayLine(seconds));
     this.reverbFeedback = REVERB_FEEDBACK;
   }
 
@@ -140,6 +149,8 @@ export class HarpDsp {
     }
   }
 
+  // Main audio processing loop
+  // 
   process(left: Float32Array, right: Float32Array) {
     for (let i = 0; i < left.length; i += 1) {
       let sample = 0;
@@ -150,12 +161,13 @@ export class HarpDsp {
       }
 
       sample *= this.params.volume * OUTPUT_GAIN;
-      const reverbed = this.processReverb(sample);
-      const withReverb = lerp(sample, reverbed, this.params.reverb);
-      const [chorusLeft, chorusRight] = this.processChorus(withReverb);
+      const [chorusLeft, chorusRight] = this.processChorus(sample);
+      const [reverbLeft, reverbRight] = this.processReverb(chorusLeft, chorusRight);
+      const dryGain = lerp(1, REVERB_DRY_GAIN_AT_MAX, this.params.reverb);
+      const wetGain = this.params.reverb * REVERB_WET_GAIN;
 
-      left[i] = softClip(chorusLeft);
-      right[i] = softClip(chorusRight);
+      left[i] = softClip(chorusLeft * dryGain + reverbLeft * wetGain);
+      right[i] = softClip(chorusRight * dryGain + reverbRight * wetGain);
     }
   }
 
@@ -272,16 +284,31 @@ export class HarpDsp {
   }
 
   // Effects
-  private processReverb(sample: number) {
-    let sum = 0;
-    for (let i = 0; i < this.reverbLines.length; i += 1) {
-      const line = this.reverbLines[i];
-      const delayed = line.buffer[line.index];
-      line.buffer[line.index] = sample + delayed * this.reverbFeedback[i];
-      line.index = (line.index + 1) % line.buffer.length;
-      sum += delayed;
+  private processReverb(leftSample: number, rightSample: number): [number, number] {
+    let leftSum = 0;
+    let rightSum = 0;
+
+    for (let i = 0; i < this.reverbLeftLines.length; i += 1) {
+      const leftLine = this.reverbLeftLines[i];
+      const rightLine = this.reverbRightLines[i];
+      const leftDelayed = leftLine.buffer[leftLine.index];
+      const rightDelayed = rightLine.buffer[rightLine.index];
+
+      leftLine.filterState += REVERB_DAMPING * (leftDelayed - leftLine.filterState);
+      rightLine.filterState += REVERB_DAMPING * (rightDelayed - rightLine.filterState);
+
+      leftLine.buffer[leftLine.index] =
+        leftSample + (leftLine.filterState + rightLine.filterState * REVERB_STEREO_CROSSFEED) * this.reverbFeedback[i];
+      rightLine.buffer[rightLine.index] =
+        rightSample + (rightLine.filterState + leftLine.filterState * REVERB_STEREO_CROSSFEED) * this.reverbFeedback[i];
+
+      leftLine.index = (leftLine.index + 1) % leftLine.buffer.length;
+      rightLine.index = (rightLine.index + 1) % rightLine.buffer.length;
+      leftSum += leftDelayed;
+      rightSum += rightDelayed;
     }
-    return sum / this.reverbLines.length;
+
+    return [leftSum / this.reverbLeftLines.length, rightSum / this.reverbRightLines.length];
   }
 
   private processChorus(sample: number): [number, number] {
@@ -289,22 +316,36 @@ export class HarpDsp {
     line.buffer[line.index] = sample;
 
     if (!this.params.chorus) {
+      this.chorusLeftWet = 0;
+      this.chorusRightWet = 0;
       line.index = (line.index + 1) % line.buffer.length;
       return [sample, sample];
     }
 
-    const rateHz = CHORUS_RATE_HZ;
-    this.chorusPhase = wrapPhase(this.chorusPhase + rateHz / this.params.sampleRate);
-    const leftDelay = CHORUS_LEFT_DELAY_SECONDS + sineWave(this.chorusPhase) * CHORUS_LEFT_DEPTH_SECONDS;
-    const rightDelay = CHORUS_RIGHT_DELAY_SECONDS + sineWave(this.chorusPhase, Math.PI * 0.5) * CHORUS_RIGHT_DEPTH_SECONDS;
-    const leftWet = this.readDelay(line, leftDelay);
-    const rightWet = this.readDelay(line, rightDelay);
-    line.buffer[line.index] = sample + (leftWet + rightWet) * CHORUS_FEEDBACK_GAIN;
+    let leftWet = 0;
+    let rightWet = 0;
+
+    for (let i = 0; i < CHORUS_VOICES.length; i += 1) {
+      const voice = CHORUS_VOICES[i];
+      const phase = wrapPhase(this.chorusPhases[i] + voice.rateHz / this.params.sampleRate);
+      this.chorusPhases[i] = phase;
+
+      const leftDelay = voice.delaySeconds + sineWave(phase) * voice.depthSeconds;
+      const rightDelay = voice.delaySeconds + sineWave(wrapPhase(phase + CHORUS_RIGHT_PHASE_OFFSET)) * voice.depthSeconds;
+      leftWet += this.readDelay(line, leftDelay);
+      rightWet += this.readDelay(line, rightDelay);
+    }
+
+    leftWet /= CHORUS_VOICES.length;
+    rightWet /= CHORUS_VOICES.length;
+    this.chorusLeftWet += CHORUS_WET_FILTER * (leftWet - this.chorusLeftWet);
+    this.chorusRightWet += CHORUS_WET_FILTER * (rightWet - this.chorusRightWet);
+    line.buffer[line.index] = sample + (this.chorusLeftWet + this.chorusRightWet) * 0.5 * CHORUS_FEEDBACK_GAIN;
     line.index = (line.index + 1) % line.buffer.length;
 
     return [
-      sample * CHORUS_DRY_GAIN + leftWet * CHORUS_WET_GAIN,
-      sample * CHORUS_DRY_GAIN + rightWet * CHORUS_WET_GAIN
+      sample * CHORUS_DRY_GAIN + this.chorusLeftWet * CHORUS_WET_GAIN,
+      sample * CHORUS_DRY_GAIN + this.chorusRightWet * CHORUS_WET_GAIN
     ];
   }
 
@@ -312,7 +353,8 @@ export class HarpDsp {
   private createDelayLine(seconds: number): DelayLine {
     return {
       buffer: new Float32Array(Math.ceil(this.params.sampleRate * seconds)),
-      index: 0
+      index: 0,
+      filterState: 0
     };
   }
 

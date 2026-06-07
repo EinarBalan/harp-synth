@@ -16,15 +16,22 @@ export const FAST_GLIDE_COEFFICIENT = 0.035;
 export const SOFT_CLIP_DRIVE = 1.4;
 export const CLAMPED_SINE_DRIVE = 1.6;
 
-export const CHORUS_DELAY_SECONDS = 0.055;
-export const CHORUS_RATE_HZ = 0.65;
-export const CHORUS_LEFT_DELAY_SECONDS = 0.018;
-export const CHORUS_LEFT_DEPTH_SECONDS = 0.005;
-export const CHORUS_RIGHT_DELAY_SECONDS = 0.022;
-export const CHORUS_RIGHT_DEPTH_SECONDS = 0.006;
-export const CHORUS_FEEDBACK_GAIN = 0.055;
-export const CHORUS_DRY_GAIN = 0.72;
-export const CHORUS_WET_GAIN = 0.28;
+export const CHORUS_DELAY_SECONDS = 0.06;
+export const CHORUS_VOICES = [
+  { delaySeconds: 0.017, depthSeconds: 0.0018, rateHz: 0.37, phaseOffset: 0 },
+  { delaySeconds: 0.024, depthSeconds: 0.0024, rateHz: 0.53, phaseOffset: 0.37 },
+  { delaySeconds: 0.031, depthSeconds: 0.0015, rateHz: 0.79, phaseOffset: 0.71 }
+] as const;
+export const CHORUS_RIGHT_PHASE_OFFSET = 0.5;
+export const CHORUS_FEEDBACK_GAIN = 0;
+export const CHORUS_WET_FILTER = 0.32;
+export const CHORUS_DRY_GAIN = 0.55;
+export const CHORUS_WET_GAIN = 0.5;
 
-export const REVERB_DELAY_SECONDS = [0.043, 0.061, 0.079, 0.101] as const;
-export const REVERB_FEEDBACK = [0.42, 0.39, 0.36, 0.33] as const;
+export const REVERB_DELAY_SECONDS = [0.053, 0.071, 0.097, 0.131] as const;
+export const REVERB_RIGHT_DELAY_SECONDS = [0.061, 0.083, 0.113, 0.149] as const;
+export const REVERB_FEEDBACK = [0.78, 0.74, 0.7, 0.66] as const;
+export const REVERB_DAMPING = 0.22;
+export const REVERB_STEREO_CROSSFEED = 0.18;
+export const REVERB_DRY_GAIN_AT_MAX = 0.75;
+export const REVERB_WET_GAIN = 0.82;
