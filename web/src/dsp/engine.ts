@@ -3,7 +3,9 @@ import {
   CHORUS_DRY_GAIN,
   CHORUS_DELAY_SECONDS,
   CHORUS_FEEDBACK_GAIN,
+  CHORUS_RIGHT_DELAY_OFFSET_SECONDS,
   CHORUS_RIGHT_PHASE_OFFSET,
+  CHORUS_STEREO_WIDTH,
   CHORUS_VOICES,
   CHORUS_WET_FILTER,
   CHORUS_WET_GAIN,
@@ -331,7 +333,10 @@ export class HarpDsp {
       this.chorusPhases[i] = phase;
 
       const leftDelay = voice.delaySeconds + sineWave(phase) * voice.depthSeconds;
-      const rightDelay = voice.delaySeconds + sineWave(wrapPhase(phase + CHORUS_RIGHT_PHASE_OFFSET)) * voice.depthSeconds;
+      const rightDelay =
+        voice.delaySeconds +
+        CHORUS_RIGHT_DELAY_OFFSET_SECONDS +
+        sineWave(wrapPhase(phase + CHORUS_RIGHT_PHASE_OFFSET)) * voice.depthSeconds;
       leftWet += this.readDelay(line, leftDelay);
       rightWet += this.readDelay(line, rightDelay);
     }
@@ -343,9 +348,14 @@ export class HarpDsp {
     line.buffer[line.index] = sample + (this.chorusLeftWet + this.chorusRightWet) * 0.5 * CHORUS_FEEDBACK_GAIN;
     line.index = (line.index + 1) % line.buffer.length;
 
+    const wetMid = (this.chorusLeftWet + this.chorusRightWet) * 0.5;
+    const wetSide = (this.chorusLeftWet - this.chorusRightWet) * 0.5 * CHORUS_STEREO_WIDTH;
+    const wideLeftWet = wetMid + wetSide;
+    const wideRightWet = wetMid - wetSide;
+
     return [
-      sample * CHORUS_DRY_GAIN + this.chorusLeftWet * CHORUS_WET_GAIN,
-      sample * CHORUS_DRY_GAIN + this.chorusRightWet * CHORUS_WET_GAIN
+      sample * CHORUS_DRY_GAIN + wideLeftWet * CHORUS_WET_GAIN,
+      sample * CHORUS_DRY_GAIN + wideRightWet * CHORUS_WET_GAIN
     ];
   }
 

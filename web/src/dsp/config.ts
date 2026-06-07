@@ -22,11 +22,13 @@ export const CHORUS_VOICES = [
   { delaySeconds: 0.024, depthSeconds: 0.0024, rateHz: 0.53, phaseOffset: 0.37 },
   { delaySeconds: 0.031, depthSeconds: 0.0015, rateHz: 0.79, phaseOffset: 0.71 }
 ] as const;
+export const CHORUS_RIGHT_DELAY_OFFSET_SECONDS = 0.004;
 export const CHORUS_RIGHT_PHASE_OFFSET = 0.5;
 export const CHORUS_FEEDBACK_GAIN = 0;
+export const CHORUS_STEREO_WIDTH = 1.45;
 export const CHORUS_WET_FILTER = 0.32;
-export const CHORUS_DRY_GAIN = 0.55;
-export const CHORUS_WET_GAIN = 0.5;
+export const CHORUS_DRY_GAIN = 0.75;
+export const CHORUS_WET_GAIN = 0.4;
 
 export const REVERB_DELAY_SECONDS = [0.053, 0.071, 0.097, 0.131] as const;
 export const REVERB_RIGHT_DELAY_SECONDS = [0.061, 0.083, 0.113, 0.149] as const;
