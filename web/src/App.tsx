@@ -53,6 +53,7 @@ export default function App() {
   const [activeBars, setActiveBars] = useState<ReadonlySet<number>>(() => new Set());
   const [helpOpen, setHelpOpen] = useState(false);
   const [showNoteLabels, setShowNoteLabels] = useState(false);
+  const [audioError, setAudioError] = useState<string | null>(null);
 
   const key = KEYS[keyIndex];
   const barCount = barCountForRange(instrumentRange);
@@ -80,6 +81,15 @@ export default function App() {
   useEffect(() => {
     audioRef.current?.setParams(params);
   }, [params]);
+
+  useEffect(() => {
+    // Build the context and load the worklet before the first touch so the opening
+    // gesture only has to resume: on iOS a resume that lands after an await is ignored.
+    // Failures here stay quiet; the retry inside start() is what surfaces them.
+    void getAudio()
+      .prepare()
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     if (monoActiveBarRef.current !== null) {
@@ -150,9 +160,17 @@ export default function App() {
     return audioRef.current;
   }
 
+  function reportAudioError(error: unknown) {
+    console.error(error);
+    setAudioError(error instanceof Error ? error.message : "Audio could not be started.");
+  }
+
   function sendAudioEvent(event: Parameters<HarpAudio["sendEvent"]>[0]) {
     const audio = getAudio();
-    void audio.start().then(() => audio.sendEvent(event));
+    // start() must stay in the gesture task for iOS, and the event has to be queued
+    // synchronously so a noteOff can never overtake its noteOn while audio spins up.
+    void audio.start().catch(reportAudioError);
+    audio.sendEvent(event);
   }
 
   function syncActiveBars() {
@@ -591,6 +609,12 @@ export default function App() {
 
           </section>
         </div>
+      ) : null}
+
+      {audioError ? (
+        <p className="audio-error" role="status">
+          {audioError}
+        </p>
       ) : null}
 
       <section className="instrument-stage" aria-label="Harp synth">

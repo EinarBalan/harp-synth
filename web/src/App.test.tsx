@@ -219,7 +219,14 @@ describe("App UI", () => {
     class FakeAudioContext {
       audioWorklet = { addModule: vi.fn().mockResolvedValue(undefined) };
       destination = {};
+      state = "running";
+      get currentTime() {
+        return performance.now() / 1000;
+      }
       resume = vi.fn().mockResolvedValue(undefined);
+      close = vi.fn().mockResolvedValue(undefined);
+      addEventListener = vi.fn();
+      removeEventListener = vi.fn();
     }
 
     class FakeAudioWorkletNode {

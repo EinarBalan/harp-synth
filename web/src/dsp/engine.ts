@@ -33,43 +33,66 @@ import { lerp, oscillatorPartial, sineWave, softClip, wrapPhase } from "./oscill
 import { clampToneIndex, getTonePreset, type TonePreset } from "./tones";
 import { clamp } from "./utils";
 
-// Public audio engine data
+/** Runtime parameters that can be changed by UI, MIDI, or control messages. */
 export interface DspParams {
+  /** Processing sample rate in Hz. */
   sampleRate: number;
+  /** Master volume, from 0 to 1. */
   volume: number;
+  /** Index into the tone preset table. */
   toneIndex: number;
+  /** Reverb mix, from 0 to 1. */
   reverb: number;
+  /** Enables stereo chorus when true. */
   chorus: boolean;
+  /** Uses slower pitch changes when true. */
   slide: boolean;
 }
 
+/** Note and pitch events accepted by the audio engine. */
 export type NoteEvent =
   | { type: "noteOn"; noteId: number; frequency: number; velocity: number }
   | { type: "noteOff"; noteId: number }
   | { type: "glide"; noteId: number; frequency: number };
 
+/** Note volume stage for each voice. */
 type EnvelopeState = "idle" | "attack" | "sustain" | "release";
 
+/** State for one playing note. */
 interface Voice {
+  /** Whether this slot is currently producing audio. */
   active: boolean;
+  /** Caller-provided note identifier used for noteOff/glide lookup. */
   noteId: number;
+  /** Position in the main wave cycle, from 0 to 1. */
   phase: number;
+  /** Current smoothed frequency in Hz. */
   frequency: number;
+  /** Requested frequency in Hz. */
   targetFrequency: number;
+  /** Note velocity, from 0 to 1. */
   velocity: number;
+  /** Current note-volume level. */
   envelope: number;
+  /** Current attack/sustain/release state. */
   state: EnvelopeState;
+  /** State for the per-voice smoothing filter. */
   filterState: number;
+  /** Separate wave-cycle positions for each sound layer. */
   partialPhases: number[];
 }
 
+/** Delay buffer state for chorus and reverb. */
 interface DelayLine {
+  /** Delay samples. */
   buffer: Float32Array;
+  /** Current write/read position in the wrapping buffer. */
   index: number;
+  /** Smoothing state used by reverb lines. */
   filterState: number;
 }
 
-// Defaults
+/** Creates the default parameter set for a sample rate. */
 export function createDefaultParams(sampleRate = DEFAULT_SAMPLE_RATE): DspParams {
   return {
     sampleRate,
@@ -81,6 +104,12 @@ export function createDefaultParams(sampleRate = DEFAULT_SAMPLE_RATE): DspParams
   };
 }
 
+/**
+ * Polyphonic harp synth DSP engine.
+ *
+ * The engine renders stereo float samples in the usual [-1, 1] audio range and
+ * owns all voice/effect state needed by an audio worklet.
+ */
 export class HarpDsp {
   private params: DspParams;
   private tone: TonePreset;
@@ -121,7 +150,7 @@ export class HarpDsp {
     this.reverbFeedback = REVERB_FEEDBACK;
   }
 
-  // Public controls
+  /** Merges new runtime parameters and clamps 0-to-1 controls. */
   setParams(params: Partial<DspParams>) {
     this.params = {
       ...this.params,
@@ -133,6 +162,7 @@ export class HarpDsp {
     this.tone = getTonePreset(this.params.toneIndex);
   }
 
+  /** Dispatches one note or glide event into the engine. */
   handleEvent(event: NoteEvent) {
     switch (event.type) {
       case "noteOn":
@@ -151,8 +181,7 @@ export class HarpDsp {
     }
   }
 
-  // Main audio processing loop
-  // 
+  /** Renders one stereo block into caller-provided output buffers. */
   process(left: Float32Array, right: Float32Array) {
     for (let i = 0; i < left.length; i += 1) {
       let sample = 0;
@@ -173,11 +202,12 @@ export class HarpDsp {
     }
   }
 
+  /** Returns the number of active voices. */
   getActiveVoiceCount() {
     return this.voices.filter((voice) => voice.active).length;
   }
 
-  // Note lifecycle
+  /** Starts or retriggers a voice for noteId. */
   private noteOn(noteId: number, frequency: number, velocity: number) {
     const existing = this.findVoice(noteId);
     const voice = existing ?? this.claimVoice();
@@ -192,6 +222,7 @@ export class HarpDsp {
     voice.state = "attack";
   }
 
+  /** Moves an active voice into release state. */
   private noteOff(noteId: number) {
     const voice = this.findVoice(noteId);
     if (voice && voice.state !== "idle") {
@@ -199,6 +230,7 @@ export class HarpDsp {
     }
   }
 
+  /** Updates the target frequency for an active voice. */
   private glide(noteId: number, frequency: number) {
     const voice = this.findVoice(noteId);
     if (voice) {
@@ -206,10 +238,12 @@ export class HarpDsp {
     }
   }
 
+  /** Finds the active voice matching noteId. */
   private findVoice(noteId: number) {
     return this.voices.find((voice) => voice.active && voice.noteId === noteId);
   }
 
+  /** Returns a free voice, or steals the quietest active voice. */
   private claimVoice() {
     return (
       this.voices.find((voice) => !voice.active) ??
@@ -217,7 +251,7 @@ export class HarpDsp {
     );
   }
 
-  // Voice rendering
+  /** Renders one mono sample for a voice and advances its state. */
   private processVoice(voice: Voice) {
     const sampleRate = this.params.sampleRate;
     const glideCoefficient = this.params.slide ? GLIDE_COEFFICIENT : FAST_GLIDE_COEFFICIENT;
@@ -232,11 +266,13 @@ export class HarpDsp {
     return filtered * envelope * voice.velocity;
   }
 
+  /** Renders the selected tone preset for a voice. */
   private oscillator(voice: Voice) {
     this.syncPartialPhases(voice);
 
     return this.tone.partials.reduce((sample, partial, index) => {
       const partialFrequency = voice.frequency * (partial.ratio ?? 1);
+      // Skip layers too high to represent cleanly at the current sample rate.
       if (partialFrequency >= this.params.sampleRate * 0.5) {
         return sample;
       }
@@ -247,6 +283,7 @@ export class HarpDsp {
     }, 0);
   }
 
+  /** Reinitializes per-layer wave positions after tone-preset changes. */
   private syncPartialPhases(voice: Voice) {
     if (voice.partialPhases.length === this.tone.partials.length) {
       return;
@@ -257,6 +294,7 @@ export class HarpDsp {
     });
   }
 
+  /** Updates the note-volume ramp and returns current level. */
   private advanceEnvelope(voice: Voice) {
     const attackStep = 1 / Math.max(1, this.params.sampleRate * ATTACK_SECONDS);
     const releaseStep = 1 / Math.max(1, this.params.sampleRate * RELEASE_SECONDS);
@@ -280,12 +318,13 @@ export class HarpDsp {
     return voice.envelope;
   }
 
+  /** Applies the selected tone preset's simple smoothing filter. */
   private applyToneFilter(voice: Voice, sample: number) {
     voice.filterState += this.tone.filterCutoff * (sample - voice.filterState);
     return voice.filterState;
   }
 
-  // Effects
+  /** Applies the stereo multi-delay reverb. */
   private processReverb(leftSample: number, rightSample: number): [number, number] {
     let leftSum = 0;
     let rightSum = 0;
@@ -299,6 +338,8 @@ export class HarpDsp {
       leftLine.filterState += REVERB_DAMPING * (leftDelayed - leftLine.filterState);
       rightLine.filterState += REVERB_DAMPING * (rightDelayed - rightLine.filterState);
 
+      // Feed a little of each side into the other side to make the reverb wider
+      // without adding more delay buffers.
       leftLine.buffer[leftLine.index] =
         leftSample + (leftLine.filterState + rightLine.filterState * REVERB_STEREO_CROSSFEED) * this.reverbFeedback[i];
       rightLine.buffer[rightLine.index] =
@@ -313,6 +354,7 @@ export class HarpDsp {
     return [leftSum / this.reverbLeftLines.length, rightSum / this.reverbRightLines.length];
   }
 
+  /** Applies stereo chorus to a mono input sample. */
   private processChorus(sample: number): [number, number] {
     const line = this.chorusLine;
     line.buffer[line.index] = sample;
@@ -327,6 +369,7 @@ export class HarpDsp {
     let leftWet = 0;
     let rightWet = 0;
 
+    // Several slowly moving delays create a wider chorus than one moving delay.
     for (let i = 0; i < CHORUS_VOICES.length; i += 1) {
       const voice = CHORUS_VOICES[i];
       const phase = wrapPhase(this.chorusPhases[i] + voice.rateHz / this.params.sampleRate);
@@ -349,6 +392,7 @@ export class HarpDsp {
     line.index = (line.index + 1) % line.buffer.length;
 
     const wetMid = (this.chorusLeftWet + this.chorusRightWet) * 0.5;
+    // Split the chorus into center and side parts, then widen the side part.
     const wetSide = (this.chorusLeftWet - this.chorusRightWet) * 0.5 * CHORUS_STEREO_WIDTH;
     const wideLeftWet = wetMid + wetSide;
     const wideRightWet = wetMid - wetSide;
@@ -359,7 +403,7 @@ export class HarpDsp {
     ];
   }
 
-  // Delay buffers
+  /** Allocates and initializes one delay line for a delay length in seconds. */
   private createDelayLine(seconds: number): DelayLine {
     return {
       buffer: new Float32Array(Math.ceil(this.params.sampleRate * seconds)),
@@ -368,6 +412,7 @@ export class HarpDsp {
     };
   }
 
+  /** Reads a delay time that falls between stored samples. */
   private readDelay(line: DelayLine, seconds: number) {
     const delaySamples = seconds * this.params.sampleRate;
     const readIndex = (line.index - delaySamples + line.buffer.length) % line.buffer.length;
