@@ -13,6 +13,8 @@ const SILENT_WAV_SAMPLE_RATE = 8000;
 const SILENT_WAV_FRAMES = 800;
 /** How long to wait for the render thread to prove it is actually producing audio. */
 const OUTPUT_CHECK_MS = 300;
+/** Stalled checks tolerated before a previously working context counts as dead. */
+const OUTPUT_CHECK_ATTEMPTS = 4;
 
 export class HarpAudio {
   private context: AudioContext | null = null;
@@ -25,6 +27,7 @@ export class HarpAudio {
   private rebuilding = false;
   private outputConfirmed = false;
   private outputCheck: Promise<void> | null = null;
+  private hasRendered = false;
 
   /**
    * Creates the context and loads the worklet ahead of the first gesture. Safe to
@@ -41,8 +44,15 @@ export class HarpAudio {
    * separate task and silently leaves the context suspended.
    */
   start() {
+    const context = this.ensureContext();
+    if (this.node && context?.state === "running") {
+      // Already playing. Re-running the unlock work per note makes iOS renegotiate the
+      // audio session mid-stream, which is audible as clicks.
+      return this.loading ?? Promise.resolve();
+    }
+
     this.claimAudioSession();
-    void this.ensureContext()?.resume().catch(() => undefined);
+    void context?.resume().catch(() => undefined);
     const loading = this.load();
     void loading.then(() => this.confirmOutput()).catch(() => undefined);
     return loading;
@@ -222,24 +232,31 @@ export class HarpAudio {
   }
 
   private async runOutputCheck() {
-    const context = this.context;
-    if (!context || context.state !== "running" || this.rebuilding) {
-      return;
+    for (let attempt = 0; attempt < OUTPUT_CHECK_ATTEMPTS; attempt += 1) {
+      const context = this.context;
+      if (!context || context.state !== "running" || this.rebuilding) {
+        return;
+      }
+
+      const startedAt = context.currentTime;
+      await new Promise((resolve) => setTimeout(resolve, OUTPUT_CHECK_MS));
+
+      if (this.context !== context || context.state !== "running") {
+        return;
+      }
+
+      if (context.currentTime !== startedAt) {
+        this.outputConfirmed = true;
+        this.hasRendered = true;
+        return;
+      }
     }
 
-    const startedAt = context.currentTime;
-    await new Promise((resolve) => setTimeout(resolve, OUTPUT_CHECK_MS));
-
-    if (this.context !== context || context.state !== "running") {
-      return;
-    }
-
-    if (context.currentTime === startedAt) {
+    // A cold context can take a while to spin up on iOS; only a context that has
+    // rendered before is treated as dead, otherwise the next gesture just retries.
+    if (this.hasRendered) {
       await this.rebuild();
-      return;
     }
-
-    this.outputConfirmed = true;
   }
 
   private async rebuild() {

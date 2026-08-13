@@ -13,9 +13,13 @@ class FakeAudioContext {
 
   destination = {};
   state = "suspended";
-  addEventListener = vi.fn();
-  removeEventListener = vi.fn();
   close = vi.fn().mockResolvedValue(undefined);
+  addEventListener = vi.fn((_type: string, listener: () => void) => {
+    this.listeners.add(listener);
+  });
+  removeEventListener = vi.fn((_type: string, listener: () => void) => {
+    this.listeners.delete(listener);
+  });
   resume = vi.fn().mockImplementation(() => {
     this.state = "running";
     return Promise.resolve();
@@ -29,14 +33,19 @@ class FakeAudioContext {
   };
 
   private frozenTime: number | null = null;
+  private listeners = new Set<() => void>();
 
   constructor() {
     FakeAudioContext.instances.push(this);
   }
 
-  /** Mimics an iOS context that reports "running" while its render thread is dead. */
-  stall() {
+  /** Mimics an iOS interruption that leaves the render thread dead after resuming. */
+  interruptAndStall() {
+    this.state = "suspended";
     this.frozenTime = Date.now() / 1000;
+    for (const listener of this.listeners) {
+      listener();
+    }
   }
 
   get currentTime() {
@@ -109,17 +118,31 @@ describe("HarpAudio", () => {
     expect(contexts[0].audioWorklet.addModule).toHaveBeenCalledTimes(2);
   });
 
-  it("rebuilds the graph when a running context stops rendering", async () => {
+  it("rebuilds the graph when an interrupted context comes back dead", async () => {
     vi.useFakeTimers();
     const contexts = installFakes();
     const audio = new HarpAudio();
 
     await audio.start();
-    contexts[0].stall();
-    await vi.advanceTimersByTimeAsync(500);
+    await vi.advanceTimersByTimeAsync(400);
+    contexts[0].interruptAndStall();
+    await vi.advanceTimersByTimeAsync(2000);
 
     expect(contexts[0].close).toHaveBeenCalled();
     expect(contexts).toHaveLength(2);
     expect(workletNodeOf(audio)).toBeTruthy();
+  });
+
+  it("leaves a slow-starting context alone instead of rebuilding it", async () => {
+    vi.useFakeTimers();
+    const contexts = installFakes();
+    const audio = new HarpAudio();
+
+    await audio.start();
+    contexts[0].interruptAndStall();
+    await vi.advanceTimersByTimeAsync(2000);
+
+    expect(contexts[0].close).not.toHaveBeenCalled();
+    expect(contexts).toHaveLength(1);
   });
 });

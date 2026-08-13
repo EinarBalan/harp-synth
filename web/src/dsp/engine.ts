@@ -118,9 +118,17 @@ export class HarpDsp {
   private chorusPhases: number[];
   private chorusLeftWet = 0;
   private chorusRightWet = 0;
+  /** Scratch stereo outputs, written by the effect stages to keep the loop allocation-free. */
+  private chorusOutLeft = 0;
+  private chorusOutRight = 0;
+  private reverbOutLeft = 0;
+  private reverbOutRight = 0;
   private reverbLeftLines: DelayLine[];
   private reverbRightLines: DelayLine[];
   private reverbFeedback: readonly number[];
+  /** Envelope ramp increments per sample; depend only on the sample rate. */
+  private attackStep = 0;
+  private releaseStep = 0;
 
   constructor(sampleRate = DEFAULT_SAMPLE_RATE, params: Partial<DspParams> = {}) {
     const defaultParams = createDefaultParams(sampleRate);
@@ -148,6 +156,13 @@ export class HarpDsp {
     this.reverbLeftLines = REVERB_DELAY_SECONDS.map((seconds) => this.createDelayLine(seconds));
     this.reverbRightLines = REVERB_RIGHT_DELAY_SECONDS.map((seconds) => this.createDelayLine(seconds));
     this.reverbFeedback = REVERB_FEEDBACK;
+    this.updateEnvelopeSteps();
+  }
+
+  /** Recomputes the cached envelope increments after a sample-rate change. */
+  private updateEnvelopeSteps() {
+    this.attackStep = 1 / Math.max(1, this.params.sampleRate * ATTACK_SECONDS);
+    this.releaseStep = 1 / Math.max(1, this.params.sampleRate * RELEASE_SECONDS);
   }
 
   /** Merges new runtime parameters and clamps 0-to-1 controls. */
@@ -160,6 +175,7 @@ export class HarpDsp {
       reverb: clamp(params.reverb ?? this.params.reverb, 0, 1)
     };
     this.tone = getTonePreset(this.params.toneIndex);
+    this.updateEnvelopeSteps();
   }
 
   /** Dispatches one note or glide event into the engine. */
@@ -181,24 +197,38 @@ export class HarpDsp {
     }
   }
 
-  /** Renders one stereo block into caller-provided output buffers. */
+  /**
+   * Renders one stereo block into caller-provided output buffers.
+   *
+   * This runs on the audio thread against a hard deadline, so everything that stays
+   * constant for the block is hoisted out and the effect stages write their results
+   * into scratch fields instead of returning freshly allocated pairs.
+   */
   process(left: Float32Array, right: Float32Array) {
-    for (let i = 0; i < left.length; i += 1) {
+    const voices = this.voices;
+    const frames = left.length;
+    const outputGain = this.params.volume * OUTPUT_GAIN;
+    const dryGain = lerp(1, REVERB_DRY_GAIN_AT_MAX, this.params.reverb);
+    const wetGain = this.params.reverb * REVERB_WET_GAIN;
+    const glideCoefficient = this.params.slide ? GLIDE_COEFFICIENT : FAST_GLIDE_COEFFICIENT;
+
+    for (let i = 0; i < frames; i += 1) {
       let sample = 0;
-      for (const voice of this.voices) {
+      for (let v = 0; v < voices.length; v += 1) {
+        const voice = voices[v];
         if (voice.active) {
-          sample += this.processVoice(voice);
+          sample += this.processVoice(voice, glideCoefficient);
         }
       }
 
-      sample *= this.params.volume * OUTPUT_GAIN;
-      const [chorusLeft, chorusRight] = this.processChorus(sample);
-      const [reverbLeft, reverbRight] = this.processReverb(chorusLeft, chorusRight);
-      const dryGain = lerp(1, REVERB_DRY_GAIN_AT_MAX, this.params.reverb);
-      const wetGain = this.params.reverb * REVERB_WET_GAIN;
+      sample *= outputGain;
+      this.processChorus(sample);
+      const chorusLeft = this.chorusOutLeft;
+      const chorusRight = this.chorusOutRight;
+      this.processReverb(chorusLeft, chorusRight);
 
-      left[i] = softClip(chorusLeft * dryGain + reverbLeft * wetGain);
-      right[i] = softClip(chorusRight * dryGain + reverbRight * wetGain);
+      left[i] = softClip(chorusLeft * dryGain + this.reverbOutLeft * wetGain);
+      right[i] = softClip(chorusRight * dryGain + this.reverbOutRight * wetGain);
     }
   }
 
@@ -252,9 +282,8 @@ export class HarpDsp {
   }
 
   /** Renders one mono sample for a voice and advances its state. */
-  private processVoice(voice: Voice) {
+  private processVoice(voice: Voice, glideCoefficient: number) {
     const sampleRate = this.params.sampleRate;
-    const glideCoefficient = this.params.slide ? GLIDE_COEFFICIENT : FAST_GLIDE_COEFFICIENT;
     voice.frequency = lerp(voice.frequency, voice.targetFrequency, glideCoefficient);
 
     // Frequency is cycles per second; sampleRate is samples per second, so this increments phase by cycles per sample.
@@ -270,17 +299,26 @@ export class HarpDsp {
   private oscillator(voice: Voice) {
     this.syncPartialPhases(voice);
 
-    return this.tone.partials.reduce((sample, partial, index) => {
+    const partials = this.tone.partials;
+    const sampleRate = this.params.sampleRate;
+    const nyquist = sampleRate * 0.5;
+    let sample = 0;
+
+    for (let index = 0; index < partials.length; index += 1) {
+      const partial = partials[index];
       const partialFrequency = voice.frequency * (partial.ratio ?? 1);
       // Skip layers too high to represent cleanly at the current sample rate.
-      if (partialFrequency >= this.params.sampleRate * 0.5) {
-        return sample;
+      if (partialFrequency >= nyquist) {
+        continue;
       }
 
-      const phaseIncrement = partialFrequency / this.params.sampleRate;
-      voice.partialPhases[index] = wrapPhase(voice.partialPhases[index] + phaseIncrement);
-      return sample + oscillatorPartial(voice.partialPhases[index], voice.frequency, partial, phaseIncrement);
-    }, 0);
+      const phaseIncrement = partialFrequency / sampleRate;
+      const phase = wrapPhase(voice.partialPhases[index] + phaseIncrement);
+      voice.partialPhases[index] = phase;
+      sample += oscillatorPartial(phase, voice.frequency, partial, phaseIncrement);
+    }
+
+    return sample;
   }
 
   /** Reinitializes per-layer wave positions after tone-preset changes. */
@@ -296,17 +334,14 @@ export class HarpDsp {
 
   /** Updates the note-volume ramp and returns current level. */
   private advanceEnvelope(voice: Voice) {
-    const attackStep = 1 / Math.max(1, this.params.sampleRate * ATTACK_SECONDS);
-    const releaseStep = 1 / Math.max(1, this.params.sampleRate * RELEASE_SECONDS);
-
     if (voice.state === "attack") {
-      voice.envelope += attackStep;
+      voice.envelope += this.attackStep;
       if (voice.envelope >= 1) {
         voice.envelope = 1;
         voice.state = "sustain";
       }
     } else if (voice.state === "release") {
-      voice.envelope -= releaseStep;
+      voice.envelope -= this.releaseStep;
       if (voice.envelope <= 0) {
         voice.envelope = 0;
         voice.state = "idle";
@@ -324,8 +359,8 @@ export class HarpDsp {
     return voice.filterState;
   }
 
-  /** Applies the stereo multi-delay reverb. */
-  private processReverb(leftSample: number, rightSample: number): [number, number] {
+  /** Applies the stereo multi-delay reverb into reverbOutLeft/reverbOutRight. */
+  private processReverb(leftSample: number, rightSample: number) {
     let leftSum = 0;
     let rightSum = 0;
 
@@ -351,11 +386,12 @@ export class HarpDsp {
       rightSum += rightDelayed;
     }
 
-    return [leftSum / this.reverbLeftLines.length, rightSum / this.reverbRightLines.length];
+    this.reverbOutLeft = leftSum / this.reverbLeftLines.length;
+    this.reverbOutRight = rightSum / this.reverbRightLines.length;
   }
 
-  /** Applies stereo chorus to a mono input sample. */
-  private processChorus(sample: number): [number, number] {
+  /** Applies stereo chorus to a mono sample, into chorusOutLeft/chorusOutRight. */
+  private processChorus(sample: number) {
     const line = this.chorusLine;
     line.buffer[line.index] = sample;
 
@@ -363,7 +399,9 @@ export class HarpDsp {
       this.chorusLeftWet = 0;
       this.chorusRightWet = 0;
       line.index = (line.index + 1) % line.buffer.length;
-      return [sample, sample];
+      this.chorusOutLeft = sample;
+      this.chorusOutRight = sample;
+      return;
     }
 
     let leftWet = 0;
@@ -397,10 +435,8 @@ export class HarpDsp {
     const wideLeftWet = wetMid + wetSide;
     const wideRightWet = wetMid - wetSide;
 
-    return [
-      sample * CHORUS_DRY_GAIN + wideLeftWet * CHORUS_WET_GAIN,
-      sample * CHORUS_DRY_GAIN + wideRightWet * CHORUS_WET_GAIN
-    ];
+    this.chorusOutLeft = sample * CHORUS_DRY_GAIN + wideLeftWet * CHORUS_WET_GAIN;
+    this.chorusOutRight = sample * CHORUS_DRY_GAIN + wideRightWet * CHORUS_WET_GAIN;
   }
 
   /** Allocates and initializes one delay line for a delay length in seconds. */
